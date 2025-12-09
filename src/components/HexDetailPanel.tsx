@@ -100,14 +100,6 @@ function formatLabel(key: string): string {
     .replace(/npc/gi, 'NPC');
 }
 
-// Default feature note keys by feature type
-// These provide a starting point; users can add/remove notes freely
-const DEFAULT_FEATURE_NOTE_KEYS: Record<string, string[]> = {
-  settlement: ['Description', 'Notable NPCs', 'Current Events'],
-  landmark: ['Description', 'Contents', 'History'],
-  lair: ['Description', 'Inhabitants', 'Treasure'],
-  dungeon: ['Description', 'Levels', 'History'],
-};
 
 // Helper to normalize feature data for storage (flattens settlement structure)
 function normalizeFeatureData(
@@ -144,6 +136,22 @@ function formatGeneratedDetails(details: Record<string, unknown>): string {
     lines.push(`${formatLabel(key)}: ${displayValue}`);
   }
   return lines.join('\n');
+}
+
+// Helper to convert generated details into feature notes
+function detailsToFeatureNotes(details: Record<string, unknown>): Record<string, string> {
+  const notes: Record<string, string> = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (value === undefined || value === null || value === '') continue;
+    if (key === 'details') continue; // Skip nested details object
+    if (key === 'name') continue; // Name is displayed separately in Hex Info
+    if (typeof value === 'object') continue; // Skip complex objects
+
+    const label = formatLabel(key);
+    const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
+    notes[label] = displayValue;
+  }
+  return notes;
 }
 
 // Default note keys that are shown initially (can be deleted by user)
@@ -262,26 +270,36 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
       forceFeatureType === 'settlement' && mode === 'force' ? forceSettlementType : undefined,
       hex.terrainId // Pass terrain for lair monster generation
     );
-    
+
     const { details, settlementName } = normalizeFeatureData(feature.type, feature.data);
-    
+
+    // Preserve original data if it exists, otherwise set it from this generation
+    const originalDetails = hex.feature?.originalDetails || details;
+    const originalFeatureType = hex.feature?.originalFeatureType || feature.type;
+    const originalTerrainId = hex.feature?.originalTerrainId || hex.terrainId;
+
+    // Convert generated details to feature notes
+    const featureNotes = detailsToFeatureNotes(details);
+
     const changes: Partial<Hex> = {
       featureType: feature.type,
       feature: {
         type: feature.type,
         details,
+        originalDetails,
+        originalFeatureType,
+        originalTerrainId,
+      },
+      campaignData: {
+        ...hex.campaignData,
+        name: settlementName || hex.campaignData?.name,
+        featureNotes,
+        deletedFeatureNotes: undefined, // Clear deleted notes on regeneration
       },
     };
-    
-    if (settlementName) {
-      changes.campaignData = {
-        ...hex.campaignData,
-        name: settlementName,
-      };
-    }
-    
+
     onHexUpdate(hex.coord, changes);
-  }, [hex.coord, hex.campaignData, forceFeatureType, forceSettlementType, onHexUpdate]);
+  }, [hex.coord, hex.terrainId, hex.campaignData, hex.feature, forceFeatureType, forceSettlementType, onHexUpdate]);
   
   const handleGenerateNames = useCallback(() => {
     let settlementType: SettlementType = 'village';
@@ -327,41 +345,43 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   }, [hex.coord, hex.campaignData?.name, hex.feature, map.factions, onAddFaction]);
   
   // Feature type change handler
+  // Note: Feature notes are intentionally preserved when changing feature types
   const handleFeatureTypeChange = useCallback((newType: string) => {
     if (newType === '') {
-      // Remove feature entirely
+      // Remove feature entirely but preserve original data and notes for reference
+      const newCampaignData = { ...campaignData };
+      delete newCampaignData.featureOverride; // Clear overrides since they're type-specific
+
       onHexUpdate(hex.coord, {
         featureType: undefined,
-        feature: undefined,
+        feature: hex.feature?.originalDetails ? {
+          type: hex.feature.type,
+          details: {},
+          originalDetails: hex.feature.originalDetails,
+          originalFeatureType: hex.feature.originalFeatureType,
+          originalTerrainId: hex.feature.originalTerrainId,
+        } : undefined,
+        campaignData: newCampaignData,
       });
-      // Also clear feature-related campaign data
-      const updates: Partial<HexCampaignData> = {};
-      if (campaignData.featureOverride) updates.featureOverride = undefined;
-      if (campaignData.featureNotes) updates.featureNotes = undefined;
-      if (campaignData.deletedFeatureNotes) updates.deletedFeatureNotes = undefined;
-      if (Object.keys(updates).length > 0) {
-        onUpdate(updates);
-      }
     } else if (newType !== hex.featureType) {
-      // Change to a different feature type - create empty feature structure
+      // Change to a different feature type - preserve original data and notes
       const featureType = newType as FeatureType;
+      const newCampaignData = { ...campaignData };
+      delete newCampaignData.featureOverride; // Clear overrides since they're type-specific
+
       onHexUpdate(hex.coord, {
         featureType,
         feature: {
           type: featureType,
           details: { type: featureType },
+          originalDetails: hex.feature?.originalDetails,
+          originalFeatureType: hex.feature?.originalFeatureType,
+          originalTerrainId: hex.feature?.originalTerrainId,
         },
+        campaignData: newCampaignData,
       });
-      // Clear old feature-related campaign data since they may not apply to new type
-      const updates: Partial<HexCampaignData> = {};
-      if (campaignData.featureOverride) updates.featureOverride = undefined;
-      if (campaignData.featureNotes) updates.featureNotes = undefined;
-      if (campaignData.deletedFeatureNotes) updates.deletedFeatureNotes = undefined;
-      if (Object.keys(updates).length > 0) {
-        onUpdate(updates);
-      }
     }
-  }, [hex.coord, hex.featureType, campaignData.featureOverride, campaignData.featureNotes, campaignData.deletedFeatureNotes, onHexUpdate, onUpdate]);
+  }, [hex.coord, hex.feature, hex.featureType, campaignData, onHexUpdate]);
   
   // Notes handlers
   const handleNoteChange = useCallback((key: string, value: string) => {
@@ -444,22 +464,10 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
     const currentNotes = campaignData.featureNotes || {};
     const { [key]: _, ...rest } = currentNotes;
 
-    // Get default keys for current feature type
-    const defaultKeys = hex.featureType ? (DEFAULT_FEATURE_NOTE_KEYS[hex.featureType] || []) : [];
-    const isDefaultNote = defaultKeys.includes(key);
-    const currentDeleted = campaignData.deletedFeatureNotes || [];
-
-    const updates: Partial<HexCampaignData> = {
+    onUpdate({
       featureNotes: Object.keys(rest).length > 0 ? rest : undefined,
-    };
-
-    // If deleting a default note, add it to deletedFeatureNotes so it doesn't come back
-    if (isDefaultNote && !currentDeleted.includes(key)) {
-      updates.deletedFeatureNotes = [...currentDeleted, key];
-    }
-
-    onUpdate(updates);
-  }, [hex.featureType, campaignData.featureNotes, campaignData.deletedFeatureNotes, onUpdate]);
+    });
+  }, [campaignData.featureNotes, onUpdate]);
 
   const handleAddFeatureNote = useCallback(() => {
     if (!newFeatureNoteKey.trim()) return;
@@ -473,36 +481,23 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
     setIsAddingFeatureNote(false);
   }, [newFeatureNoteKey, campaignData.featureNotes, onUpdate]);
 
-  // Get all feature note keys: existing notes + default keys for this feature type (unless explicitly deleted)
+  // Get all feature note keys: existing notes only (defaults are added during generation, not here)
   const featureNoteKeys = React.useMemo(() => {
     if (!hex.featureType) return [];
 
     const existing = Object.keys(campaignData.featureNotes || {});
-    const deleted = new Set(campaignData.deletedFeatureNotes || []);
+
+    // Only use existing notes - defaults are populated during feature generation
+    // This ensures notes persist when changing feature types
     const allKeys = new Set(existing);
 
-    // Add default keys for this feature type unless they've been explicitly deleted
-    const defaultKeys = DEFAULT_FEATURE_NOTE_KEYS[hex.featureType] || [];
-    defaultKeys.forEach(k => {
-      if (!deleted.has(k)) {
-        allKeys.add(k);
-      }
-    });
-
-    // Sort: defaults first (in order), then custom notes alphabetically
+    // Sort alphabetically
     const sorted = Array.from(allKeys).sort((a, b) => {
-      const aIsDefault = defaultKeys.includes(a);
-      const bIsDefault = defaultKeys.includes(b);
-      if (aIsDefault && bIsDefault) {
-        return defaultKeys.indexOf(a) - defaultKeys.indexOf(b);
-      }
-      if (aIsDefault) return -1;
-      if (bIsDefault) return 1;
       return a.localeCompare(b);
     });
 
     return sorted;
-  }, [hex.featureType, campaignData.featureNotes, campaignData.deletedFeatureNotes]);
+  }, [hex.featureType, campaignData.featureNotes]);
 
   // Faction territory handlers
   const handleAddToFaction = useCallback((factionId: string) => {
@@ -563,27 +558,33 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
       const updates: Array<{ coord: HexCoord; changes: Partial<Hex> }> = results
         .filter(result => result.featureType && result.feature)
         .map(result => {
-          const featureData = 'data' in result.feature! 
-            ? result.feature!.data 
+          const featureData = 'data' in result.feature!
+            ? result.feature!.data
             : result.feature;
-          
+
           const { details, settlementName } = normalizeFeatureData(result.featureType!, featureData);
-          
+
+          // Convert generated details to feature notes
+          const featureNotes = detailsToFeatureNotes(details);
+
+          // Get the terrain for this hex
+          const hexTerrainId = terrainMap.get(coordToKey(result.coord));
+
           const changes: Partial<Hex> = {
             featureType: result.featureType,
             feature: {
               type: result.featureType!,
               details,
+              originalDetails: details,
+              originalFeatureType: result.featureType!,
+              originalTerrainId: hexTerrainId,
+            },
+            campaignData: {
+              name: settlementName,
+              featureNotes,
             },
           };
-          
-          // Set name for settlements
-          if (settlementName) {
-            changes.campaignData = {
-              name: settlementName,
-            };
-          }
-          
+
           return { coord: result.coord, changes };
         });
       
@@ -644,23 +645,28 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
         const hasExistingFeature = existingFeatures.has(coordToKey(result.coord));
         if (result.featureType && result.feature && !hasExistingFeature) {
           changes.featureType = result.featureType;
-          
-          const featureData = 'data' in result.feature 
-            ? result.feature.data 
+
+          const featureData = 'data' in result.feature
+            ? result.feature.data
             : result.feature;
-          
+
           const { details, settlementName } = normalizeFeatureData(result.featureType, featureData);
-          
+
+          // Convert generated details to feature notes
+          const featureNotes = detailsToFeatureNotes(details);
+
           changes.feature = {
             type: result.featureType,
             details,
+            originalDetails: details,
+            originalFeatureType: result.featureType,
+            originalTerrainId: result.terrainId,
           };
-          
-          if (settlementName) {
-            changes.campaignData = {
-              name: settlementName,
-            };
-          }
+
+          changes.campaignData = {
+            name: settlementName,
+            featureNotes,
+          };
         }
         
         return { coord: result.coord, changes };
@@ -1057,7 +1063,14 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                 <span className="panel-row-label">Terrain</span>
                 <span className="panel-row-value">{terrain.name}</span>
               </div>
-              
+
+              {campaignData.name && (
+                <div className="panel-row">
+                  <span className="panel-row-label">Name</span>
+                  <span className="panel-row-value">{campaignData.name}</span>
+                </div>
+              )}
+
               {campaignData.lastVisited && (
                 <div className="panel-row">
                   <span className="panel-row-label">Last Visited</span>
@@ -1174,20 +1187,44 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                 </div>
               </div>
 
-              {/* Generated Details (collapsible) */}
-              <div className="panel">
-                <Accordion title="Generated Details" defaultOpen={false}>
-                  <pre className="text-sm text-muted" style={{
-                    whiteSpace: 'pre-wrap',
-                    fontFamily: 'inherit',
-                    margin: 0,
-                    lineHeight: 1.5
-                  }}>
-                    {formatGeneratedDetails(hex.feature.details) || 'No generated details'}
-                  </pre>
-                </Accordion>
-              </div>
             </>
+          )}
+
+          {/* Original Generated Details (collapsible) - show even without feature type */}
+          {hex.feature?.originalDetails && (
+            <div className="panel">
+              <Accordion title="Original Generated Details" defaultOpen={false}>
+                {/* Show original terrain and feature type */}
+                {(hex.feature.originalTerrainId || hex.feature.originalFeatureType) && (
+                  <div className="mb-2 pb-2" style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    {hex.feature.originalTerrainId && (
+                      <div className="panel-row">
+                        <span className="panel-row-label">Terrain</span>
+                        <span className="panel-row-value">
+                          {allTerrains.find(t => t.id === hex.feature!.originalTerrainId)?.name || hex.feature.originalTerrainId}
+                        </span>
+                      </div>
+                    )}
+                    {hex.feature.originalFeatureType && (
+                      <div className="panel-row">
+                        <span className="panel-row-label">Feature Type</span>
+                        <span className="panel-row-value">
+                          {hex.feature.originalFeatureType.charAt(0).toUpperCase() + hex.feature.originalFeatureType.slice(1)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <pre className="text-sm text-muted" style={{
+                  whiteSpace: 'pre-wrap',
+                  fontFamily: 'inherit',
+                  margin: 0,
+                  lineHeight: 1.5
+                }}>
+                  {formatGeneratedDetails(hex.feature.originalDetails) || 'No generated details'}
+                </pre>
+              </Accordion>
+            </div>
           )}
         </>
       )}

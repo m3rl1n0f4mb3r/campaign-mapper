@@ -33,6 +33,31 @@ function normalizeFeatureData(
   };
 }
 
+// Helper to format a key for display
+function formatLabel(key: string): string {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, str => str.toUpperCase())
+    .replace(/_/g, ' ')
+    .replace(/npc/gi, 'NPC');
+}
+
+// Helper to convert generated details into feature notes
+function detailsToFeatureNotes(details: Record<string, unknown>): Record<string, string> {
+  const notes: Record<string, string> = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (value === undefined || value === null || value === '') continue;
+    if (key === 'details') continue; // Skip nested details object
+    if (key === 'name') continue; // Name is displayed separately in Hex Info
+    if (typeof value === 'object') continue; // Skip complex objects
+
+    const label = formatLabel(key);
+    const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
+    notes[label] = displayValue;
+  }
+  return notes;
+}
+
 interface GeneratorPanelProps {
   map: CampaignMap;
   selectedCoords: HexCoord[];
@@ -154,30 +179,40 @@ const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
         forceFeatureType === 'settlement' && featureMode === 'force' ? forceSettlementType : undefined,
         terrainId // Pass terrain for lair monster generation
       );
-      
+
       const { details, settlementName } = normalizeFeatureData(feature.type, feature.data);
-      
+
+      // Preserve original data if it exists, otherwise set it from this generation
+      const originalDetails = hex?.feature?.originalDetails || details;
+      const originalFeatureType = hex?.feature?.originalFeatureType || feature.type;
+      const originalTerrainId = hex?.feature?.originalTerrainId || terrainId;
+
+      // Convert generated details to feature notes
+      const featureNotes = detailsToFeatureNotes(details);
+
       // Convert feature to hex data
       const changes: Partial<Hex> = {
         featureType: feature.type,
         feature: {
           type: feature.type,
           details,
+          originalDetails,
+          originalFeatureType,
+          originalTerrainId,
+        },
+        campaignData: {
+          ...hex?.campaignData,
+          name: settlementName || hex?.campaignData?.name,
+          featureNotes,
+          deletedFeatureNotes: undefined, // Clear deleted notes on regeneration
         },
       };
-      
-      // If settlement, also set the name
-      if (settlementName) {
-        changes.campaignData = {
-          name: settlementName,
-        };
-      }
-      
+
       updates.push({ coord, changes });
     }
     
     onUpdateHexes(updates);
-  }, [selectedCoords, featureMode, forceFeatureType, forceSettlementType, onUpdateHexes]);
+  }, [selectedCoords, map.hexes, featureMode, forceFeatureType, forceSettlementType, onUpdateHexes]);
   
   // ============================================
   // NAME GENERATION

@@ -398,6 +398,35 @@ function normalizeFeatureData(
 }
 
 /**
+ * Format a key for display
+ */
+function formatLabel(key: string): string {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, str => str.toUpperCase())
+    .replace(/_/g, ' ')
+    .replace(/npc/gi, 'NPC');
+}
+
+/**
+ * Convert generated details into feature notes
+ */
+function detailsToFeatureNotes(details: Record<string, unknown>): Record<string, string> {
+  const notes: Record<string, string> = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (value === undefined || value === null || value === '') continue;
+    if (key === 'details') continue;
+    if (key === 'name') continue; // Name is displayed separately in Hex Info
+    if (typeof value === 'object') continue;
+
+    const label = formatLabel(key);
+    const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
+    notes[label] = displayValue;
+  }
+  return notes;
+}
+
+/**
  * Apply generation results to hex array
  */
 export function applyGenerationResults(
@@ -418,26 +447,31 @@ export function applyGenerationResults(
     
     if (result.featureType && result.feature) {
       updates.featureType = result.featureType;
-      
-      // Extract data from the generator feature type  
-      const featureData = 'data' in result.feature 
-        ? result.feature.data 
+
+      // Extract data from the generator feature type
+      const featureData = 'data' in result.feature
+        ? result.feature.data
         : result.feature;
-      
+
       const { details, settlementName } = normalizeFeatureData(result.featureType, featureData);
-      
+
+      // Convert generated details to feature notes
+      const featureNotes = detailsToFeatureNotes(details);
+
       updates.feature = {
         type: result.featureType,
         details,
+        originalDetails: details,
+        originalFeatureType: result.featureType,
+        originalTerrainId: result.terrainId,
       };
-      
-      // Set name for settlements
-      if (settlementName) {
-        updates.campaignData = {
-          ...hex.campaignData,
-          name: settlementName,
-        };
-      }
+
+      // Set campaign data with name and feature notes
+      updates.campaignData = {
+        ...hex.campaignData,
+        name: settlementName || hex.campaignData?.name,
+        featureNotes,
+      };
     }
     
     return { ...hex, ...updates };

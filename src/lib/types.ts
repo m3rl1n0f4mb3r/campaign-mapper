@@ -70,6 +70,9 @@ export interface GeneratedFeature {
   type: FeatureType;
   name?: string;
   details: Record<string, unknown>;
+  originalDetails?: Record<string, unknown>;  // Preserved copy of first-generated details
+  originalFeatureType?: FeatureType;  // Original feature type when first generated
+  originalTerrainId?: string;  // Terrain when feature was first generated
 }
 
 // ============================================
