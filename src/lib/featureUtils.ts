@@ -8,6 +8,11 @@
  * Handles special cases like NPC and subcategory suffixes (flora_a → Flora (A))
  */
 export function formatLabel(key: string): string {
+  // If string already has spaces, it's likely already formatted - just capitalize first letter
+  if (key.includes(' ')) {
+    return key.replace(/^./, str => str.toUpperCase());
+  }
+
   return key
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, str => str.toUpperCase())
@@ -37,17 +42,31 @@ export function normalizeFeatureData(
     };
   }
   if (featureType === 'landmark') {
-    // For landmarks, the 'name' field contains the rolled landmark (e.g., "Fallen tree")
-    const landmark = data as { name?: string; [key: string]: unknown };
+    // For landmarks, use data directly - 'nature' field will display in feature notes
     return {
       details: data as Record<string, unknown>,
-      featureName: landmark.name,
     };
   }
   // For other feature types, use data directly
   return {
     details: data as Record<string, unknown>,
   };
+}
+
+/**
+ * Format a value for display
+ * Applies formatLabel to snake_case strings, handles booleans
+ */
+function formatValue(value: unknown): string {
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+  if (typeof value === 'string') {
+    // Apply formatLabel to handle snake_case values like "small_structure" or "flora_a"
+    // Already formatted strings like "Fallen tree" pass through unchanged
+    return formatLabel(value);
+  }
+  return String(value);
 }
 
 /**
@@ -63,7 +82,7 @@ export function detailsToFeatureNotes(details: Record<string, unknown>): Record<
     if (typeof value === 'object') continue; // Skip complex objects
 
     const label = formatLabel(key);
-    const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
+    const displayValue = formatValue(value);
     notes[label] = displayValue;
   }
   return notes;
@@ -79,8 +98,7 @@ export function formatGeneratedDetails(details: Record<string, unknown>): string
     if (key === 'details') continue; // Skip nested details object
     if (typeof value === 'object') continue; // Skip complex objects
 
-    const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
-    lines.push(`${formatLabel(key)}: ${displayValue}`);
+    lines.push(`${formatLabel(key)}: ${formatValue(value)}`);
   }
   return lines.join('\n');
 }
