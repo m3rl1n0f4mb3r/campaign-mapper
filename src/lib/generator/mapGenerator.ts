@@ -7,11 +7,12 @@
 import type { HexCoord, Hex } from '../types';
 import { coordToKey } from '../types';
 import { getNeighbors, hexDistance } from '../hexUtils';
+import { normalizeFeatureData, detailsToFeatureNotes } from '../featureUtils';
 import type { BiomeType, FeatureType, GeneratedFeature as GeneratorFeature } from './types';
-import { 
-  generateStartingBiome, 
-  generateNextBiome, 
-  biomeToTerrainId 
+import {
+  generateStartingBiome,
+  generateNextBiome,
+  biomeToTerrainId
 } from './biomeGenerator';
 import { generateFeature, rollFeatureType } from './featureGenerator';
 import { percentageCheck } from './tableSystem';
@@ -373,60 +374,6 @@ function hasAnyNeighborTerrain(coord: HexCoord, biomeMap: Map<string, BiomeType>
 }
 
 /**
- * Normalize feature data for storage (flattens settlement structure)
- */
-function normalizeFeatureData(
-  featureType: string,
-  data: unknown
-): { details: Record<string, unknown>; settlementName?: string } {
-  if (featureType === 'settlement') {
-    // For settlements, flatten the structure: merge type, name with details
-    const settlement = data as { type: string; name: string; details?: Record<string, string> };
-    return {
-      details: {
-        type: settlement.type,
-        name: settlement.name,
-        ...(settlement.details || {}),
-      },
-      settlementName: settlement.name,
-    };
-  }
-  // For other feature types, use data directly
-  return {
-    details: data as Record<string, unknown>,
-  };
-}
-
-/**
- * Format a key for display
- */
-function formatLabel(key: string): string {
-  return key
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, str => str.toUpperCase())
-    .replace(/_/g, ' ')
-    .replace(/npc/gi, 'NPC');
-}
-
-/**
- * Convert generated details into feature notes
- */
-function detailsToFeatureNotes(details: Record<string, unknown>): Record<string, string> {
-  const notes: Record<string, string> = {};
-  for (const [key, value] of Object.entries(details)) {
-    if (value === undefined || value === null || value === '') continue;
-    if (key === 'details') continue;
-    if (key === 'name') continue; // Name is displayed separately in Hex Info
-    if (typeof value === 'object') continue;
-
-    const label = formatLabel(key);
-    const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
-    notes[label] = displayValue;
-  }
-  return notes;
-}
-
-/**
  * Apply generation results to hex array
  */
 export function applyGenerationResults(
@@ -453,7 +400,7 @@ export function applyGenerationResults(
         ? result.feature.data
         : result.feature;
 
-      const { details, settlementName } = normalizeFeatureData(result.featureType, featureData);
+      const { details, featureName } = normalizeFeatureData(result.featureType, featureData);
 
       // Convert generated details to feature notes
       const featureNotes = detailsToFeatureNotes(details);
@@ -469,7 +416,7 @@ export function applyGenerationResults(
       // Set campaign data with name and feature notes
       updates.campaignData = {
         ...hex.campaignData,
-        name: settlementName || hex.campaignData?.name,
+        name: featureName || hex.campaignData?.name,
         featureNotes,
       };
     }
