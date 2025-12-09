@@ -70,6 +70,9 @@ export interface GeneratedFeature {
   type: FeatureType;
   name?: string;
   details: Record<string, unknown>;
+  originalDetails?: Record<string, unknown>;  // Preserved copy of first-generated details
+  originalFeatureType?: FeatureType;  // Original feature type when first generated
+  originalTerrainId?: string;  // Terrain when feature was first generated
 }
 
 // ============================================
@@ -83,20 +86,25 @@ export interface HexCampaignData {
   // Core campaign fields
   name?: string;
   tags?: string[];
-  
+
   // Arbitrary notes - key-value pairs for user content
   // Users can add/remove any notes they want
   notes?: Record<string, string>;
   // Track which default notes the user has explicitly deleted
   deletedNotes?: string[];
-  
+
+  // Feature notes - separate from campaign notes, tied to the hex's feature
+  featureNotes?: Record<string, string>;
+  // Track which default feature notes the user has explicitly deleted
+  deletedFeatureNotes?: string[];
+
   // Overrides
   terrainOverride?: string;          // Override detected/generated terrain
   featureOverride?: Record<string, unknown>;
-  
+
   // Custom user-defined fields (for programmatic use)
   customFields?: Record<string, string | number | boolean>;
-  
+
   // State tracking
   explored?: boolean;
   hidden?: boolean;
@@ -286,18 +294,7 @@ export const DEFAULT_CAMPAIGN_SETTINGS: CampaignSettings = {
   showGrid: true,
   showCoordinates: true,
   hexFillOpacity: 0.5,
-  availableTags: [
-    'explored',
-    'dangerous',
-    'safe',
-    'quest',
-    'treasure',
-    'cleared',
-    'friendly',
-    'hostile',
-    'mystery',
-    'camp',
-  ],
+  availableTags: [], // User-defined tags only
   customTerrainTypes: [],
 };
 

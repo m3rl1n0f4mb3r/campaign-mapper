@@ -430,14 +430,85 @@ export const SPECIAL_TABLE: RollableTable = {
   id: 'special',
   name: 'Special Content',
   category: 'content',
-  diceFormula: '1d12',
+  diceFormula: '1d10',
   entries: [
     { id: 'e1', min: 1, max: 1, value: 'Arbitrate a dispute' },
     { id: 'e2', min: 2, max: 2, value: 'Prevent a threat' },
     { id: 'e3', min: 3, max: 3, value: 'Solve a puzzle/riddle' },
     { id: 'e4', min: 4, max: 6, value: 'Uncover a mystery' },
-    { id: 'e5', min: 7, max: 9, value: 'NPC(s)/Monster(s) in need' },
-    { id: 'e6', min: 10, max: 12, value: 'Related to landmark' },
+    { id: 'e5', min: 7, max: 10, value: 'NPC(s)/Monster(s) in need' },
+  ],
+};
+
+// ============================================
+// SPECIAL CONTENT SUB-TABLES (p.22-23)
+// ============================================
+
+export const DISPUTES_TABLE: RollableTable = {
+  id: 'disputes',
+  name: 'Disputes to Arbitrate',
+  category: 'content',
+  diceFormula: '1d6',
+  entries: [
+    { id: 'e1', min: 1, max: 1, value: 'Adultery' },
+    { id: 'e2', min: 2, max: 2, value: 'Broken trade agreement' },
+    { id: 'e3', min: 3, max: 3, value: 'Division of an inheritance' },
+    { id: 'e4', min: 4, max: 4, value: 'Murder investigation' },
+    { id: 'e5', min: 5, max: 5, value: 'Territorial boundaries' },
+    { id: 'e6', min: 6, max: 6, value: 'Trial' },
+  ],
+};
+
+export const THREATS_TABLE: RollableTable = {
+  id: 'threats',
+  name: 'Threats to Prevent',
+  category: 'content',
+  diceFormula: '1d6',
+  entries: [
+    { id: 'e1', min: 1, max: 1, value: 'Evil ceremony' },
+    { id: 'e2', min: 2, max: 2, value: 'Flood' },
+    { id: 'e3', min: 3, max: 3, value: 'Frenzied migratory animals' },
+    { id: 'e4', min: 4, max: 4, value: 'Magic corruption' },
+    { id: 'e5', min: 5, max: 5, value: 'Plague' },
+    { id: 'e6', min: 6, max: 6, value: 'Wildfire' },
+  ],
+};
+
+export const MYSTERIES_TABLE: RollableTable = {
+  id: 'mysteries',
+  name: 'Mysteries to Uncover',
+  category: 'content',
+  diceFormula: '1d10',
+  entries: [
+    { id: 'e1', min: 1, max: 1, value: 'Abductions' },
+    { id: 'e2', min: 2, max: 2, value: 'Alleged ghost' },
+    { id: 'e3', min: 3, max: 3, value: 'Curse' },
+    { id: 'e4', min: 4, max: 4, value: 'Miracle' },
+    { id: 'e5', min: 5, max: 5, value: 'Missing items' },
+    { id: 'e6', min: 6, max: 6, value: 'Mutations' },
+    { id: 'e7', min: 7, max: 7, value: 'Odd footprints/tracks' },
+    { id: 'e8', min: 8, max: 8, value: 'Stalker' },
+    { id: 'e9', min: 9, max: 9, value: 'Strange lights/noises' },
+    { id: 'e10', min: 10, max: 10, value: 'Unexplained deaths' },
+  ],
+};
+
+export const NPC_PROBLEMS_TABLE: RollableTable = {
+  id: 'npc-problems',
+  name: 'Potential Problems for NPCs',
+  category: 'content',
+  diceFormula: '1d10',
+  entries: [
+    { id: 'e1', min: 1, max: 1, value: 'Amnesia' },
+    { id: 'e2', min: 2, max: 2, value: 'Attacked/Chased' },
+    { id: 'e3', min: 3, max: 3, value: 'Disappearance' },
+    { id: 'e4', min: 4, max: 4, value: 'Hunger/Thirst' },
+    { id: 'e5', min: 5, max: 5, value: 'Imprisoned/Enslaved' },
+    { id: 'e6', min: 6, max: 6, value: 'Injured/Sick' },
+    { id: 'e7', min: 7, max: 7, value: 'Lost' },
+    { id: 'e8', min: 8, max: 8, value: 'Stuck/Bogged down' },
+    { id: 'e9', min: 9, max: 9, value: 'Theft' },
+    { id: 'e10', min: 10, max: 10, value: 'Trapped' },
   ],
 };
 
@@ -468,4 +539,8 @@ export default {
   HAZARD_TABLE,
   EMPTY_INFO_TABLE,
   SPECIAL_TABLE,
+  DISPUTES_TABLE,
+  THREATS_TABLE,
+  MYSTERIES_TABLE,
+  NPC_PROBLEMS_TABLE,
 };

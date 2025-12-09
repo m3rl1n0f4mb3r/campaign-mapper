@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import type { HexCoord, Hex, Faction, CampaignMap } from '@/lib/types';
 import { coordToKey } from '@/lib/types';
 import { axialToOffset } from '@/lib/hexUtils';
+import { normalizeFeatureData, detailsToFeatureNotes } from '@/lib/featureUtils';
 import type { BiomeType, SettlementType, FeatureType } from '@/lib/generator/types';
 import { generateTerrain } from '@/lib/generator/biomeGenerator';
 import { generateFeature } from '@/lib/generator/featureGenerator';
@@ -9,29 +10,6 @@ import { generateNameOptions } from '@/lib/generator/nameGenerator';
 import { createFactionFromSettlement, generateFactionRelationships } from '@/lib/generator/politicalGenerator';
 
 type GeneratorTab = 'terrain' | 'feature' | 'political' | 'detail';
-
-// Helper to normalize feature data for storage (flattens settlement structure)
-function normalizeFeatureData(
-  featureType: string,
-  data: unknown
-): { details: Record<string, unknown>; settlementName?: string } {
-  if (featureType === 'settlement') {
-    // For settlements, flatten the structure: merge type, name with details
-    const settlement = data as { type: string; name: string; details?: Record<string, string> };
-    return {
-      details: {
-        type: settlement.type,
-        name: settlement.name,
-        ...(settlement.details || {}),
-      },
-      settlementName: settlement.name,
-    };
-  }
-  // For other feature types, use data directly
-  return {
-    details: data as Record<string, unknown>,
-  };
-}
 
 interface GeneratorPanelProps {
   map: CampaignMap;
@@ -154,30 +132,40 @@ const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
         forceFeatureType === 'settlement' && featureMode === 'force' ? forceSettlementType : undefined,
         terrainId // Pass terrain for lair monster generation
       );
-      
-      const { details, settlementName } = normalizeFeatureData(feature.type, feature.data);
-      
+
+      const { details, featureName } = normalizeFeatureData(feature.type, feature.data);
+
+      // Preserve original data if it exists, otherwise set it from this generation
+      const originalDetails = hex?.feature?.originalDetails || details;
+      const originalFeatureType = hex?.feature?.originalFeatureType || feature.type;
+      const originalTerrainId = hex?.feature?.originalTerrainId || terrainId;
+
+      // Convert generated details to feature notes
+      const featureNotes = detailsToFeatureNotes(details);
+
       // Convert feature to hex data
       const changes: Partial<Hex> = {
         featureType: feature.type,
         feature: {
           type: feature.type,
           details,
+          originalDetails,
+          originalFeatureType,
+          originalTerrainId,
+        },
+        campaignData: {
+          ...hex?.campaignData,
+          name: featureName || hex?.campaignData?.name,
+          featureNotes,
+          deletedFeatureNotes: undefined, // Clear deleted notes on regeneration
         },
       };
-      
-      // If settlement, also set the name
-      if (settlementName) {
-        changes.campaignData = {
-          name: settlementName,
-        };
-      }
-      
+
       updates.push({ coord, changes });
     }
     
     onUpdateHexes(updates);
-  }, [selectedCoords, featureMode, forceFeatureType, forceSettlementType, onUpdateHexes]);
+  }, [selectedCoords, map.hexes, featureMode, forceFeatureType, forceSettlementType, onUpdateHexes]);
   
   // ============================================
   // NAME GENERATION

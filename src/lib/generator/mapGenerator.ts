@@ -7,11 +7,12 @@
 import type { HexCoord, Hex } from '../types';
 import { coordToKey } from '../types';
 import { getNeighbors, hexDistance } from '../hexUtils';
+import { normalizeFeatureData, detailsToFeatureNotes } from '../featureUtils';
 import type { BiomeType, FeatureType, GeneratedFeature as GeneratorFeature } from './types';
-import { 
-  generateStartingBiome, 
-  generateNextBiome, 
-  biomeToTerrainId 
+import {
+  generateStartingBiome,
+  generateNextBiome,
+  biomeToTerrainId
 } from './biomeGenerator';
 import { generateFeature, rollFeatureType } from './featureGenerator';
 import { percentageCheck } from './tableSystem';
@@ -373,31 +374,6 @@ function hasAnyNeighborTerrain(coord: HexCoord, biomeMap: Map<string, BiomeType>
 }
 
 /**
- * Normalize feature data for storage (flattens settlement structure)
- */
-function normalizeFeatureData(
-  featureType: string,
-  data: unknown
-): { details: Record<string, unknown>; settlementName?: string } {
-  if (featureType === 'settlement') {
-    // For settlements, flatten the structure: merge type, name with details
-    const settlement = data as { type: string; name: string; details?: Record<string, string> };
-    return {
-      details: {
-        type: settlement.type,
-        name: settlement.name,
-        ...(settlement.details || {}),
-      },
-      settlementName: settlement.name,
-    };
-  }
-  // For other feature types, use data directly
-  return {
-    details: data as Record<string, unknown>,
-  };
-}
-
-/**
  * Apply generation results to hex array
  */
 export function applyGenerationResults(
@@ -418,26 +394,31 @@ export function applyGenerationResults(
     
     if (result.featureType && result.feature) {
       updates.featureType = result.featureType;
-      
-      // Extract data from the generator feature type  
-      const featureData = 'data' in result.feature 
-        ? result.feature.data 
+
+      // Extract data from the generator feature type
+      const featureData = 'data' in result.feature
+        ? result.feature.data
         : result.feature;
-      
-      const { details, settlementName } = normalizeFeatureData(result.featureType, featureData);
-      
+
+      const { details, featureName } = normalizeFeatureData(result.featureType, featureData);
+
+      // Convert generated details to feature notes
+      const featureNotes = detailsToFeatureNotes(details);
+
       updates.feature = {
         type: result.featureType,
         details,
+        originalDetails: details,
+        originalFeatureType: result.featureType,
+        originalTerrainId: result.terrainId,
       };
-      
-      // Set name for settlements
-      if (settlementName) {
-        updates.campaignData = {
-          ...hex.campaignData,
-          name: settlementName,
-        };
-      }
+
+      // Set campaign data with name and feature notes
+      updates.campaignData = {
+        ...hex.campaignData,
+        name: featureName || hex.campaignData?.name,
+        featureNotes,
+      };
     }
     
     return { ...hex, ...updates };

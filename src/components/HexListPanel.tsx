@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Hex, HexCoord, CampaignMap, TerrainType } from '@/lib/types';
 import { coordToKey, DEFAULT_TERRAIN_TYPES } from '@/lib/types';
 import { axialToOffset } from '@/lib/hexUtils';
@@ -17,6 +17,7 @@ const FILTER_TITLES: Record<StatsFilterType, string> = {
   withData: 'Hexes with Campaign Data',
   explored: 'Explored Hexes',
   withFeatures: 'Hexes with Features',
+  withTags: 'Hexes with Tags',
   factions: 'Factions',
 };
 
@@ -27,12 +28,27 @@ const HexListPanel: React.FC<HexListPanelProps> = ({
   onHexClick,
   onClose,
 }) => {
+  const [selectedTag, setSelectedTag] = useState<string>('');
+
   const allTerrains = [...DEFAULT_TERRAIN_TYPES, ...customTerrainTypes];
-  
+
   const getTerrainInfo = (terrainId: string): TerrainType => {
     return allTerrains.find(t => t.id === terrainId) || allTerrains[0];
   };
-  
+
+  // Collect all unique tags used in the map
+  const usedTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const hex of map.hexes) {
+      if (hex.campaignData?.tags) {
+        for (const tag of hex.campaignData.tags) {
+          tagSet.add(tag);
+        }
+      }
+    }
+    return Array.from(tagSet).sort();
+  }, [map.hexes]);
+
   const filteredHexes = useMemo(() => {
     switch (filter) {
       case 'all':
@@ -47,10 +63,17 @@ const HexListPanel: React.FC<HexListPanelProps> = ({
         return map.hexes.filter(h => h.campaignData?.explored);
       case 'withFeatures':
         return map.hexes.filter(h => h.featureType);
+      case 'withTags':
+        if (selectedTag) {
+          // Filter by specific tag
+          return map.hexes.filter(h => h.campaignData?.tags?.includes(selectedTag));
+        }
+        // Show all hexes with any tags
+        return map.hexes.filter(h => h.campaignData?.tags?.length);
       default:
         return [];
     }
-  }, [map, filter]);
+  }, [map, filter, selectedTag]);
   
   // Sort by coordinates
   const sortedHexes = useMemo(() => {
@@ -90,10 +113,33 @@ const HexListPanel: React.FC<HexListPanelProps> = ({
       </div>
       
       <div className="panel-content">
+        {/* Tag filter dropdown */}
+        {filter === 'withTags' && usedTags.length > 0 && (
+          <div className="mb-2">
+            <select
+              className="form-select"
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              <option value="">All tags ({usedTags.length})</option>
+              {usedTags.map(tag => {
+                const count = map.hexes.filter(h => h.campaignData?.tags?.includes(tag)).length;
+                return (
+                  <option key={tag} value={tag}>
+                    {tag} ({count})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
+
         <p className="text-muted text-sm mb-2">
           {sortedHexes.length} hex{sortedHexes.length !== 1 ? 'es' : ''}
+          {selectedTag && ` tagged "${selectedTag}"`}
         </p>
-        
+
         <div className="hex-list">
           {sortedHexes.map(hex => {
             const terrain = getTerrainInfo(hex.terrainId);

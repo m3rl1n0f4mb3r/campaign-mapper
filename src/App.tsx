@@ -567,7 +567,6 @@ function App() {
                 gridConfig={currentMap.gridConfig}
                 map={currentMap}
                 factions={currentMap.factions}
-                availableTags={currentMap.settings.availableTags}
                 customTerrainTypes={currentMap.settings.customTerrainTypes}
                 onUpdate={handleHexUpdate}
                 onTerrainChange={handleTerrainChange}
@@ -584,7 +583,7 @@ function App() {
               <MultiSelectPanel
                 selectedCoords={multiSelectedCoords}
                 gridConfig={currentMap.gridConfig}
-                availableTags={currentMap.settings.availableTags}
+                map={currentMap}
                 customTerrainTypes={currentMap.settings.customTerrainTypes}
                 onBulkSetTerrain={handleBulkSetTerrain}
                 onBulkAddTags={handleBulkAddTags}

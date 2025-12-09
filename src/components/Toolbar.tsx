@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { CampaignMap } from '@/lib/types';
 
-export type StatsFilterType = 'all' | 'withData' | 'explored' | 'factions' | 'withFeatures';
+export type StatsFilterType = 'all' | 'withData' | 'explored' | 'factions' | 'withFeatures' | 'withTags';
 
 interface ToolbarProps {
   map: CampaignMap | null;
@@ -83,6 +83,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     )).length,
     explored: map.hexes.filter(h => h.campaignData?.explored).length,
     withFeatures: map.hexes.filter(h => h.featureType).length,
+    withTags: map.hexes.filter(h => h.campaignData?.tags?.length).length,
     factions: map.factions?.length ?? 0,
   } : null;
   
@@ -209,7 +210,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             >
               ✎ {stats.withData}
             </button>
-            <button 
+            <button
               className="toolbar-stat-btn"
               onClick={() => onStatsClick('explored')}
               title="Explored hexes - click to view"
@@ -217,7 +218,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
             >
               ✓ {stats.explored}
             </button>
-            <button 
+            <button
+              className="toolbar-stat-btn"
+              onClick={() => onStatsClick('withTags')}
+              title="Hexes with tags - click to filter by tag"
+              style={{ color: 'var(--warning, #f59e0b)' }}
+            >
+              🏷 {stats.withTags}
+            </button>
+            <button
               className="toolbar-stat-btn"
               onClick={() => onStatsClick('factions')}
               title="Factions - click to manage"

@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import type { Hex, HexCoord, TerrainType, Faction, HexCampaignData, GridConfig, CampaignMap } from '@/lib/types';
 import { hexHasUserData, getEffectiveTerrain, DEFAULT_TERRAIN_TYPES, coordToKey } from '@/lib/types';
 import { axialToOffset } from '@/lib/hexUtils';
+import { normalizeFeatureData, detailsToFeatureNotes, formatGeneratedDetails } from '@/lib/featureUtils';
 import type { BiomeType, SettlementType, FeatureType } from '@/lib/generator/types';
 import { generateTerrain } from '@/lib/generator/biomeGenerator';
 import { generateFeature } from '@/lib/generator/featureGenerator';
@@ -43,7 +44,6 @@ interface HexDetailPanelProps {
   gridConfig: GridConfig;
   map: CampaignMap;
   factions: Faction[];
-  availableTags: string[];
   customTerrainTypes: TerrainType[];
   onUpdate: (updates: Partial<HexCampaignData>) => void;
   onTerrainChange: (terrainId: string) => void;
@@ -55,7 +55,7 @@ interface HexDetailPanelProps {
   onClose: () => void;
 }
 
-type TabId = 'overview' | 'campaign' | 'details' | 'generate';
+type TabId = 'overview' | 'campaign' | 'generate';
 
 // Generator constants
 const BIOME_OPTIONS: { value: BiomeType; label: string }[] = [
@@ -91,238 +91,6 @@ function getTerrainInfo(terrainId: string, customTerrains: TerrainType[]): Terra
   };
 }
 
-// Helper to format a key for display
-function formatLabel(key: string): string {
-  return key
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, str => str.toUpperCase())
-    .replace(/_/g, ' ')
-    .replace(/npc/gi, 'NPC');
-}
-
-// Feature detail field definitions by feature type
-interface FeatureField {
-  key: string;
-  label: string;
-  editable?: boolean;
-}
-
-// Settlement type-specific field definitions
-// All fields are editable - user has full control over generated data
-const SETTLEMENT_FIELDS: Record<string, FeatureField[]> = {
-  hamlet: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'building', label: 'Main Building', editable: true },
-    { key: 'layout', label: 'Layout', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'secret', label: 'Secret', editable: true },
-  ],
-  village: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'size', label: 'Size', editable: true },
-    { key: 'layout', label: 'Layout', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'ruler', label: 'Ruler', editable: true },
-    { key: 'occupation', label: 'Additional Occupation', editable: true },
-    { key: 'specialLocation', label: 'Special Location', editable: true },
-    { key: 'defense', label: 'Defense', editable: true },
-    { key: 'notableNpc', label: 'Notable NPC', editable: true },
-    { key: 'secret', label: 'Secret', editable: true },
-    { key: 'event', label: 'Event', editable: true },
-  ],
-  city: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'size', label: 'Size', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'ruler', label: 'Ruler', editable: true },
-    { key: 'occupation', label: 'Main Occupation', editable: true },
-    { key: 'characteristic', label: 'Characteristics', editable: true },
-    { key: 'appearance', label: 'Appearance', editable: true },
-    { key: 'specialLocation', label: 'Special Location', editable: true },
-    { key: 'notableNpc', label: 'Notable NPC', editable: true },
-    { key: 'event', label: 'Event', editable: true },
-  ],
-  castle: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'condition', label: 'Condition', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'keepShape', label: 'Keep Shape', editable: true },
-    { key: 'keepLevels', label: 'Keep Levels', editable: true },
-    { key: 'defense', label: 'Defenses', editable: true },
-    { key: 'wallShape', label: 'Wall Shape', editable: true },
-    { key: 'event', label: 'Event', editable: true },
-  ],
-  tower: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'levels', label: 'Levels', editable: true },
-    { key: 'material', label: 'Material', editable: true },
-    { key: 'shape', label: 'Shape', editable: true },
-    { key: 'topLevel', label: 'Top Level', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-  ],
-  abbey: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'size', label: 'Size', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'garden', label: 'Garden', editable: true },
-    { key: 'farming', label: 'Farming', editable: true },
-    { key: 'fame', label: 'Fame', editable: true },
-    { key: 'event', label: 'Event', editable: true },
-  ],
-};
-
-// All fields are editable - user has full control over generated data
-const FEATURE_FIELDS: Record<string, FeatureField[]> = {
-  landmark: [
-    { key: 'category', label: 'Category', editable: true },
-    { key: 'subCategory', label: 'Type', editable: true },
-    { key: 'name', label: 'Landmark', editable: true },
-    { key: 'content', label: 'Content', editable: true },
-    { key: 'hasTreasure', label: 'Has Treasure', editable: true },
-    { key: 'hazard', label: 'Hazard', editable: true },
-    { key: 'information', label: 'Information', editable: true },
-    { key: 'special', label: 'Special', editable: true },
-  ],
-  // Settlement uses SETTLEMENT_FIELDS based on settlement type
-  settlement: [],
-  lair: [
-    { key: 'monsterType', label: 'Monster Type', editable: true },
-    { key: 'layout', label: 'Layout', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'percentOutside', label: '% Outside', editable: true },
-  ],
-  dungeon: [
-    { key: 'levels', label: 'Levels', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-  ],
-};
-
-// Helper to get fields for a feature, handling settlement sub-types
-function getFeatureFields(featureType: string, details: Record<string, unknown>): FeatureField[] {
-  if (featureType === 'settlement') {
-    const settlementType = details.type as string || 'village';
-    return SETTLEMENT_FIELDS[settlementType] || SETTLEMENT_FIELDS.village;
-  }
-  return FEATURE_FIELDS[featureType] || [];
-}
-
-// Helper to normalize feature data for storage (flattens settlement structure)
-function normalizeFeatureData(
-  featureType: string,
-  data: unknown
-): { details: Record<string, unknown>; settlementName?: string } {
-  if (featureType === 'settlement') {
-    // For settlements, flatten the structure: merge type, name with details
-    const settlement = data as { type: string; name: string; details?: Record<string, string> };
-    return {
-      details: {
-        type: settlement.type,
-        name: settlement.name,
-        ...(settlement.details || {}),
-      },
-      settlementName: settlement.name,
-    };
-  }
-  // For other feature types, use data directly
-  return {
-    details: data as Record<string, unknown>,
-  };
-}
-
-// Render feature details with editable fields
-function renderFeatureDetails(
-  featureType: string,
-  details: Record<string, unknown>,
-  overrides: Record<string, unknown>,
-  onOverride: (key: string, value: string | undefined) => void
-): React.ReactNode {
-  const fields = getFeatureFields(featureType, details);
-  
-  // Collect all keys from details that we have values for
-  const renderedKeys = new Set<string>();
-  const elements: React.ReactNode[] = [];
-  
-  // First render defined fields in order
-  for (const field of fields) {
-    const rawValue = details[field.key];
-    const override = overrides[field.key];
-    
-    // Skip if no value
-    // For editable fields, always show them (even if empty) so user can fill them in
-    // For non-editable fields, skip if no value
-    if (!field.editable && rawValue === undefined && override === undefined) continue;
-    
-    renderedKeys.add(field.key);
-    
-    // Get effective value (override takes precedence)
-    const effectiveValue = override !== undefined ? override : rawValue;
-    
-    // Format value for display
-    let displayValue: string;
-    if (typeof effectiveValue === 'boolean') {
-      displayValue = effectiveValue ? 'Yes' : 'No';
-    } else if (typeof effectiveValue === 'object' && effectiveValue !== null) {
-      // Skip complex objects
-      continue;
-    } else {
-      displayValue = String(effectiveValue ?? '');
-    }
-    
-    if (field.editable) {
-      elements.push(
-        <div key={field.key} className="form-group" style={{ marginBottom: 'var(--spacing-sm)' }}>
-          <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '2px' }}>
-            {field.label}
-            {override !== undefined && (
-              <span className="text-muted" style={{ marginLeft: '0.5rem', fontSize: '0.65rem' }}>(edited)</span>
-            )}
-          </label>
-          <input
-            type="text"
-            className="form-input"
-            value={override !== undefined ? String(override) : displayValue}
-            onChange={(e) => onOverride(field.key, e.target.value || undefined)}
-            placeholder={String(rawValue ?? `Enter ${field.label.toLowerCase()}...`)}
-            style={{ fontSize: '0.85rem' }}
-          />
-        </div>
-      );
-    } else {
-      elements.push(
-        <div key={field.key} className="panel-row">
-          <span className="panel-row-label">{field.label}</span>
-          <span className="panel-row-value">{displayValue}</span>
-        </div>
-      );
-    }
-  }
-  
-  // Then render any additional fields from details that weren't in our definitions
-  for (const [key, value] of Object.entries(details)) {
-    if (renderedKeys.has(key)) continue;
-    if (value === undefined || value === null || value === '') continue;
-    if (key === 'details') continue; // Skip nested details object
-    
-    // Skip complex objects
-    if (typeof value === 'object') continue;
-    
-    const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
-    
-    elements.push(
-      <div key={key} className="panel-row">
-        <span className="panel-row-label">{formatLabel(key)}</span>
-        <span className="panel-row-value">{displayValue}</span>
-      </div>
-    );
-  }
-  
-  if (elements.length === 0) {
-    return <p className="text-muted text-sm">No details generated</p>;
-  }
-  
-  return <>{elements}</>;
-}
-
 // Default note keys that are shown initially (can be deleted by user)
 const DEFAULT_NOTE_KEYS = ['Description', 'Points of Interest', 'Events'];
 
@@ -332,7 +100,6 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   gridConfig,
   map,
   factions,
-  availableTags,
   customTerrainTypes,
   onUpdate,
   onTerrainChange,
@@ -349,6 +116,16 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   // Notes state
   const [newNoteKey, setNewNoteKey] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [isEditingCampaignNotes, setIsEditingCampaignNotes] = useState(false);
+
+  // Feature notes state
+  const [newFeatureNoteKey, setNewFeatureNoteKey] = useState('');
+  const [isAddingFeatureNote, setIsAddingFeatureNote] = useState(false);
+  const [isEditingFeatureNotes, setIsEditingFeatureNotes] = useState(false);
+
+  // Overview edit mode state
+  const [isEditingOverview, setIsEditingOverview] = useState(false);
+  const [isEditingTags, setIsEditingTags] = useState(false);
   
   // Generator state
   const [forceBiome, setForceBiome] = useState<BiomeType>('grassland');
@@ -369,7 +146,20 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   const effectiveTerrain = getEffectiveTerrain(hex);
   const terrain = getTerrainInfo(effectiveTerrain, customTerrainTypes);
   const allTerrains = [...DEFAULT_TERRAIN_TYPES, ...customTerrainTypes];
-  
+
+  // Collect all unique tags used across all hexes in the map (for autocomplete)
+  const allUsedTags = React.useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const h of map.hexes) {
+      if (h.campaignData?.tags) {
+        for (const tag of h.campaignData.tags) {
+          tagSet.add(tag);
+        }
+      }
+    }
+    return Array.from(tagSet).sort();
+  }, [map.hexes]);
+
   // Find factions that control this hex
   const hexKey = coordToKey(hex.coord);
   const controllingFactions = factions.filter(f => 
@@ -435,26 +225,36 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
       forceFeatureType === 'settlement' && mode === 'force' ? forceSettlementType : undefined,
       hex.terrainId // Pass terrain for lair monster generation
     );
-    
-    const { details, settlementName } = normalizeFeatureData(feature.type, feature.data);
-    
+
+    const { details, featureName } = normalizeFeatureData(feature.type, feature.data);
+
+    // Preserve original data if it exists, otherwise set it from this generation
+    const originalDetails = hex.feature?.originalDetails || details;
+    const originalFeatureType = hex.feature?.originalFeatureType || feature.type;
+    const originalTerrainId = hex.feature?.originalTerrainId || hex.terrainId;
+
+    // Convert generated details to feature notes
+    const featureNotes = detailsToFeatureNotes(details);
+
     const changes: Partial<Hex> = {
       featureType: feature.type,
       feature: {
         type: feature.type,
         details,
+        originalDetails,
+        originalFeatureType,
+        originalTerrainId,
+      },
+      campaignData: {
+        ...hex.campaignData,
+        name: featureName || hex.campaignData?.name,
+        featureNotes,
+        deletedFeatureNotes: undefined, // Clear deleted notes on regeneration
       },
     };
-    
-    if (settlementName) {
-      changes.campaignData = {
-        ...hex.campaignData,
-        name: settlementName,
-      };
-    }
-    
+
     onHexUpdate(hex.coord, changes);
-  }, [hex.coord, hex.campaignData, forceFeatureType, forceSettlementType, onHexUpdate]);
+  }, [hex.coord, hex.terrainId, hex.campaignData, hex.feature, forceFeatureType, forceSettlementType, onHexUpdate]);
   
   const handleGenerateNames = useCallback(() => {
     let settlementType: SettlementType = 'village';
@@ -499,46 +299,44 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
     }
   }, [hex.coord, hex.campaignData?.name, hex.feature, map.factions, onAddFaction]);
   
-  // Feature override handler
-  const handleFeatureOverride = useCallback((key: string, value: string | undefined) => {
-    const currentOverrides = campaignData.featureOverride || {};
-    if (value === undefined || value === '') {
-      // Remove the override
-      const { [key]: _, ...rest } = currentOverrides;
-      onUpdate({ featureOverride: Object.keys(rest).length > 0 ? rest : undefined });
-    } else {
-      onUpdate({ featureOverride: { ...currentOverrides, [key]: value } });
-    }
-  }, [campaignData.featureOverride, onUpdate]);
-  
   // Feature type change handler
+  // Note: Feature notes are intentionally preserved when changing feature types
   const handleFeatureTypeChange = useCallback((newType: string) => {
     if (newType === '') {
-      // Remove feature entirely
-      onHexUpdate(hex.coord, { 
-        featureType: undefined, 
-        feature: undefined,
+      // Remove feature entirely but preserve original data and notes for reference
+      const newCampaignData = { ...campaignData };
+      delete newCampaignData.featureOverride; // Clear overrides since they're type-specific
+
+      onHexUpdate(hex.coord, {
+        featureType: undefined,
+        feature: hex.feature?.originalDetails ? {
+          type: hex.feature.type,
+          details: {},
+          originalDetails: hex.feature.originalDetails,
+          originalFeatureType: hex.feature.originalFeatureType,
+          originalTerrainId: hex.feature.originalTerrainId,
+        } : undefined,
+        campaignData: newCampaignData,
       });
-      // Also clear feature overrides
-      if (campaignData.featureOverride) {
-        onUpdate({ featureOverride: undefined });
-      }
     } else if (newType !== hex.featureType) {
-      // Change to a different feature type - create empty feature structure
+      // Change to a different feature type - preserve original data and notes
       const featureType = newType as FeatureType;
+      const newCampaignData = { ...campaignData };
+      delete newCampaignData.featureOverride; // Clear overrides since they're type-specific
+
       onHexUpdate(hex.coord, {
         featureType,
         feature: {
           type: featureType,
           details: { type: featureType },
+          originalDetails: hex.feature?.originalDetails,
+          originalFeatureType: hex.feature?.originalFeatureType,
+          originalTerrainId: hex.feature?.originalTerrainId,
         },
+        campaignData: newCampaignData,
       });
-      // Clear old feature overrides since they may not apply to new type
-      if (campaignData.featureOverride) {
-        onUpdate({ featureOverride: undefined });
-      }
     }
-  }, [hex.coord, hex.featureType, campaignData.featureOverride, onHexUpdate, onUpdate]);
+  }, [hex.coord, hex.feature, hex.featureType, campaignData, onHexUpdate]);
   
   // Notes handlers
   const handleNoteChange = useCallback((key: string, value: string) => {
@@ -610,7 +408,52 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
     
     return sorted;
   }, [campaignData.notes, campaignData.deletedNotes]);
-  
+
+  // Feature notes handlers
+  const handleFeatureNoteChange = useCallback((key: string, value: string) => {
+    const currentNotes = campaignData.featureNotes || {};
+    onUpdate({ featureNotes: { ...currentNotes, [key]: value } });
+  }, [campaignData.featureNotes, onUpdate]);
+
+  const handleDeleteFeatureNote = useCallback((key: string) => {
+    const currentNotes = campaignData.featureNotes || {};
+    const { [key]: _, ...rest } = currentNotes;
+
+    onUpdate({
+      featureNotes: Object.keys(rest).length > 0 ? rest : undefined,
+    });
+  }, [campaignData.featureNotes, onUpdate]);
+
+  const handleAddFeatureNote = useCallback(() => {
+    if (!newFeatureNoteKey.trim()) return;
+    const key = newFeatureNoteKey.trim();
+    const currentNotes = campaignData.featureNotes || {};
+    // Don't overwrite existing notes
+    if (!(key in currentNotes)) {
+      onUpdate({ featureNotes: { ...currentNotes, [key]: '' } });
+    }
+    setNewFeatureNoteKey('');
+    setIsAddingFeatureNote(false);
+  }, [newFeatureNoteKey, campaignData.featureNotes, onUpdate]);
+
+  // Get all feature note keys: existing notes only (defaults are added during generation, not here)
+  const featureNoteKeys = React.useMemo(() => {
+    if (!hex.featureType) return [];
+
+    const existing = Object.keys(campaignData.featureNotes || {});
+
+    // Only use existing notes - defaults are populated during feature generation
+    // This ensures notes persist when changing feature types
+    const allKeys = new Set(existing);
+
+    // Sort alphabetically
+    const sorted = Array.from(allKeys).sort((a, b) => {
+      return a.localeCompare(b);
+    });
+
+    return sorted;
+  }, [hex.featureType, campaignData.featureNotes]);
+
   // Faction territory handlers
   const handleAddToFaction = useCallback((factionId: string) => {
     const faction = factions.find(f => f.id === factionId);
@@ -670,27 +513,33 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
       const updates: Array<{ coord: HexCoord; changes: Partial<Hex> }> = results
         .filter(result => result.featureType && result.feature)
         .map(result => {
-          const featureData = 'data' in result.feature! 
-            ? result.feature!.data 
+          const featureData = 'data' in result.feature!
+            ? result.feature!.data
             : result.feature;
-          
-          const { details, settlementName } = normalizeFeatureData(result.featureType!, featureData);
-          
+
+          const { details, featureName } = normalizeFeatureData(result.featureType!, featureData);
+
+          // Convert generated details to feature notes
+          const featureNotes = detailsToFeatureNotes(details);
+
+          // Get the terrain for this hex
+          const hexTerrainId = terrainMap.get(coordToKey(result.coord));
+
           const changes: Partial<Hex> = {
             featureType: result.featureType,
             feature: {
               type: result.featureType!,
               details,
+              originalDetails: details,
+              originalFeatureType: result.featureType!,
+              originalTerrainId: hexTerrainId,
+            },
+            campaignData: {
+              name: featureName,
+              featureNotes,
             },
           };
-          
-          // Set name for settlements
-          if (settlementName) {
-            changes.campaignData = {
-              name: settlementName,
-            };
-          }
-          
+
           return { coord: result.coord, changes };
         });
       
@@ -751,23 +600,28 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
         const hasExistingFeature = existingFeatures.has(coordToKey(result.coord));
         if (result.featureType && result.feature && !hasExistingFeature) {
           changes.featureType = result.featureType;
-          
-          const featureData = 'data' in result.feature 
-            ? result.feature.data 
+
+          const featureData = 'data' in result.feature
+            ? result.feature.data
             : result.feature;
-          
-          const { details, settlementName } = normalizeFeatureData(result.featureType, featureData);
-          
+
+          const { details, featureName } = normalizeFeatureData(result.featureType, featureData);
+
+          // Convert generated details to feature notes
+          const featureNotes = detailsToFeatureNotes(details);
+
           changes.feature = {
             type: result.featureType,
             details,
+            originalDetails: details,
+            originalFeatureType: result.featureType,
+            originalTerrainId: result.terrainId,
           };
-          
-          if (settlementName) {
-            changes.campaignData = {
-              name: settlementName,
-            };
-          }
+
+          changes.campaignData = {
+            name: featureName,
+            featureNotes,
+          };
         }
         
         return { coord: result.coord, changes };
@@ -868,12 +722,6 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
           Campaign
         </button>
         <button
-          className={`tab ${activeTab === 'details' ? 'active' : ''}`}
-          onClick={() => setActiveTab('details')}
-        >
-          Details
-        </button>
-        <button
           className={`tab ${activeTab === 'generate' ? 'active' : ''}`}
           onClick={() => setActiveTab('generate')}
         >
@@ -886,91 +734,178 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
         <>
           {/* Quick Info */}
           <div className="panel">
+            <div className="panel-header">
+              <span className="panel-title">Quick Info</span>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setIsEditingOverview(!isEditingOverview)}
+                style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+              >
+                {isEditingOverview ? 'Done' : 'Edit'}
+              </button>
+            </div>
             <div className="panel-content">
-              {/* Name */}
-              <div className="form-group">
-                <label className="form-label">Name</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={campaignData.name || ''}
-                  onChange={(e) => handleFieldChange('name', e.target.value)}
-                  placeholder="Give this hex a name..."
-                />
-              </div>
-              
-              {/* Terrain */}
-              <div className="form-group">
-                <label className="form-label">Terrain</label>
-                <select
-                  className="form-select"
-                  value={effectiveTerrain}
-                  onChange={(e) => onTerrainChange(e.target.value)}
-                >
-                  {allTerrains.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Explored */}
-              <div className="panel-row">
-                <span className="panel-row-label">Explored</span>
-                <button
-                  className={`btn btn-sm ${campaignData.explored ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={handleToggleExplored}
-                >
-                  {campaignData.explored ? 'Yes' : 'No'}
-                </button>
-              </div>
-              
-              {/* Factions */}
-              <div className="mt-3">
-                <label className="form-label">Controlled By</label>
-                {controllingFactions.length === 0 ? (
-                  <p className="text-sm text-muted">No faction controls this hex</p>
-                ) : (
-                  <div className="flex flex-col gap-1 mb-2">
-                    {controllingFactions.map(f => (
-                      <div key={f.id} className="faction-control-item">
-                        <span 
-                          className="color-dot"
-                          style={{ backgroundColor: f.color }}
-                        />
-                        <span className="text-sm flex-1">{f.name}</span>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => handleRemoveFromFaction(f.id)}
-                          title="Remove from faction"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
+              {isEditingOverview ? (
+                <>
+                  {/* Edit mode */}
+                  {/* Name */}
+                  <div className="form-group">
+                    <label className="form-label">Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={campaignData.name || ''}
+                      onChange={(e) => handleFieldChange('name', e.target.value)}
+                      placeholder="Give this hex a name..."
+                    />
                   </div>
-                )}
-                
-                {/* Add to faction dropdown */}
-                {factions.filter(f => !controllingFactions.some(cf => cf.id === f.id)).length > 0 && (
-                  <select
-                    className="form-select"
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        handleAddToFaction(e.target.value);
-                        e.target.value = '';
-                      }
-                    }}
-                  >
-                    <option value="">Add to faction...</option>
-                    {factions
-                      .filter(f => !controllingFactions.some(cf => cf.id === f.id))
-                      .map(f => (
-                        <option key={f.id} value={f.id}>{f.name}</option>
+
+                  {/* Terrain */}
+                  <div className="form-group">
+                    <label className="form-label">Terrain</label>
+                    <select
+                      className="form-select"
+                      value={effectiveTerrain}
+                      onChange={(e) => onTerrainChange(e.target.value)}
+                    >
+                      {allTerrains.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
-                  </select>
-                )}
-              </div>
+                    </select>
+                  </div>
+
+                  {/* Explored */}
+                  <div className="panel-row">
+                    <span className="panel-row-label">Explored</span>
+                    <button
+                      className={`btn btn-sm ${campaignData.explored ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={handleToggleExplored}
+                    >
+                      {campaignData.explored ? 'Yes' : 'No'}
+                    </button>
+                  </div>
+
+                  {/* Feature Type selector */}
+                  <div className="form-group mt-3">
+                    <label className="form-label">Feature Type</label>
+                    <select
+                      className="form-select"
+                      value={hex.featureType || ''}
+                      onChange={(e) => handleFeatureTypeChange(e.target.value)}
+                    >
+                      <option value="">None</option>
+                      {FEATURE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Factions */}
+                  <div className="mt-3">
+                    <label className="form-label">Controlled By</label>
+                    {controllingFactions.length === 0 ? (
+                      <p className="text-sm text-muted">No faction controls this hex</p>
+                    ) : (
+                      <div className="flex flex-col gap-1 mb-2">
+                        {controllingFactions.map(f => (
+                          <div key={f.id} className="faction-control-item">
+                            <span
+                              className="color-dot"
+                              style={{ backgroundColor: f.color }}
+                            />
+                            <span className="text-sm flex-1">{f.name}</span>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => handleRemoveFromFaction(f.id)}
+                              title="Remove from faction"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add to faction dropdown */}
+                    {factions.filter(f => !controllingFactions.some(cf => cf.id === f.id)).length > 0 && (
+                      <select
+                        className="form-select"
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAddToFaction(e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                      >
+                        <option value="">Add to faction...</option>
+                        {factions
+                          .filter(f => !controllingFactions.some(cf => cf.id === f.id))
+                          .map(f => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                      </select>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* View mode */}
+                  <div className="panel-row">
+                    <span className="panel-row-label">Name</span>
+                    <span className="panel-row-value">{campaignData.name || '—'}</span>
+                  </div>
+
+                  <div className="panel-row">
+                    <span className="panel-row-label">Terrain</span>
+                    <span className="panel-row-value">{terrain.name}</span>
+                  </div>
+
+                  <div className="panel-row">
+                    <span className="panel-row-label">Explored</span>
+                    <span className="panel-row-value">{campaignData.explored ? 'Yes' : 'No'}</span>
+                  </div>
+
+                  {hex.featureType && (
+                    <div className="panel-row">
+                      <span className="panel-row-label">Feature</span>
+                      <span className="panel-row-value">
+                        {hex.featureType.charAt(0).toUpperCase() + hex.featureType.slice(1)}
+                      </span>
+                    </div>
+                  )}
+
+                  {campaignData.lastVisited && (
+                    <div className="panel-row">
+                      <span className="panel-row-label">Last Visited</span>
+                      <span className="panel-row-value">
+                        {new Date(campaignData.lastVisited).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="panel-row" style={{ alignItems: 'flex-start' }}>
+                    <span className="panel-row-label">Controlled By</span>
+                    <span className="panel-row-value">
+                      {controllingFactions.length === 0 ? (
+                        '—'
+                      ) : (
+                        <span className="flex flex-col gap-1">
+                          {controllingFactions.map(f => (
+                            <span key={f.id} className="flex items-center gap-1">
+                              <span
+                                className="color-dot"
+                                style={{ backgroundColor: f.color }}
+                              />
+                              {f.name}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
           
@@ -978,47 +913,82 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
           <div className="panel">
             <div className="panel-header">
               <span className="panel-title">Tags</span>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setIsEditingTags(!isEditingTags)}
+                style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+              >
+                {isEditingTags ? 'Done' : 'Edit'}
+              </button>
             </div>
             <div className="panel-content">
-              <div className="tags-container mb-2">
-                {(campaignData.tags || []).length === 0 ? (
-                  <span className="text-muted text-sm">No tags</span>
-                ) : (
-                  (campaignData.tags || []).map(tag => (
-                    <span key={tag} className={`tag tag-${tag}`}>
-                      {tag}
-                      <span 
-                        className="tag-remove" 
-                        onClick={() => handleRemoveTag(tag)}
-                      >
-                        ×
-                      </span>
-                    </span>
-                  ))
-                )}
-              </div>
-              
-              <div className="flex gap-2">
-                <select
-                  className="form-select"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                >
-                  <option value="">Add tag...</option>
-                  {availableTags
-                    .filter(t => !(campaignData.tags || []).includes(t))
-                    .map(tag => (
-                      <option key={tag} value={tag}>{tag}</option>
-                    ))}
-                </select>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => handleAddTag(newTag)}
-                  disabled={!newTag}
-                >
-                  Add
-                </button>
-              </div>
+              {isEditingTags ? (
+                <>
+                  {/* Edit mode - show tags with remove buttons and add functionality */}
+                  <div className="tags-container mb-2">
+                    {(campaignData.tags || []).length === 0 ? (
+                      <span className="text-muted text-sm">No tags</span>
+                    ) : (
+                      (campaignData.tags || []).map(tag => (
+                        <span key={tag} className={`tag tag-${tag}`}>
+                          {tag}
+                          <span
+                            className="tag-remove"
+                            onClick={() => handleRemoveTag(tag)}
+                          >
+                            ×
+                          </span>
+                        </span>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      className="form-input flex-1"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newTag.trim()) {
+                          handleAddTag(newTag.trim());
+                        }
+                      }}
+                      placeholder="Type a tag..."
+                      list="tag-suggestions"
+                    />
+                    <datalist id="tag-suggestions">
+                      {allUsedTags
+                        .filter(t => !(campaignData.tags || []).includes(t))
+                        .map(tag => (
+                          <option key={tag} value={tag} />
+                        ))}
+                    </datalist>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleAddTag(newTag.trim())}
+                      disabled={!newTag.trim()}
+                    >
+                      Add
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* View mode - show tags without edit controls */}
+                  <div className="tags-container">
+                    {(campaignData.tags || []).length === 0 ? (
+                      <span className="text-muted text-sm">No tags</span>
+                    ) : (
+                      (campaignData.tags || []).map(tag => (
+                        <span key={tag} className={`tag tag-${tag}`}>
+                          {tag}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
           
@@ -1031,13 +1001,13 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
               <div className="neighbors-grid">
                 {neighbors.map(neighbor => {
                   const nTerrain = getTerrainInfo(
-                    getEffectiveTerrain(neighbor), 
+                    getEffectiveTerrain(neighbor),
                     customTerrainTypes
                   );
                   const hasData = hexHasUserData(neighbor);
                   const { col: nCol, row: nRow } = axialToOffset(neighbor.coord, gridConfig);
                   const nDisplayCoord = `${String(nCol).padStart(2, '0')}${String(nRow).padStart(2, '0')}`;
-                  
+
                   return (
                     <div
                       key={`${neighbor.coord.q},${neighbor.coord.r}`}
@@ -1057,157 +1027,280 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Feature Notes - only show if hex has a feature */}
+          {hex.featureType && hex.feature && (
+            <div className="panel">
+              <div className="panel-header">
+                <span className="panel-title">
+                  {hex.featureType.charAt(0).toUpperCase() + hex.featureType.slice(1)} Notes
+                </span>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setIsEditingFeatureNotes(!isEditingFeatureNotes)}
+                  style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                >
+                  {isEditingFeatureNotes ? 'Done' : 'Edit'}
+                </button>
+              </div>
+              <div className="panel-content">
+                {isEditingFeatureNotes ? (
+                  <>
+                    {/* Edit mode - show textareas */}
+                    {featureNoteKeys.map(key => (
+                      <div key={key} className="form-group">
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="form-label" style={{ marginBottom: 0 }}>{key}</label>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => handleDeleteFeatureNote(key)}
+                            title={`Delete "${key}" note`}
+                            style={{ padding: '2px 6px', fontSize: '0.75rem' }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <textarea
+                          className="form-textarea"
+                          value={(campaignData.featureNotes || {})[key] || ''}
+                          onChange={(e) => handleFeatureNoteChange(key, e.target.value)}
+                          placeholder={`Enter ${key.toLowerCase()}...`}
+                          rows={3}
+                        />
+                      </div>
+                    ))}
+
+                    {/* Empty state */}
+                    {featureNoteKeys.length === 0 && !isAddingFeatureNote && (
+                      <p className="text-muted text-sm mb-3">No notes yet. Add one below.</p>
+                    )}
+
+                    {/* Add new feature note */}
+                    {isAddingFeatureNote ? (
+                      <div className="form-group">
+                        <label className="form-label">New Note Name</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            className="form-input flex-1"
+                            value={newFeatureNoteKey}
+                            onChange={(e) => setNewFeatureNoteKey(e.target.value)}
+                            placeholder="e.g., Rumors, Secrets, Treasure..."
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddFeatureNote();
+                              if (e.key === 'Escape') {
+                                setIsAddingFeatureNote(false);
+                                setNewFeatureNoteKey('');
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={handleAddFeatureNote}
+                            disabled={!newFeatureNoteKey.trim()}
+                          >
+                            Add
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              setIsAddingFeatureNote(false);
+                              setNewFeatureNoteKey('');
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => setIsAddingFeatureNote(true)}
+                        style={{ width: '100%' }}
+                      >
+                        + Add Note
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {/* View mode - show read-only notes */}
+                    {featureNoteKeys.length > 0 ? (
+                      featureNoteKeys.map(key => {
+                        const value = (campaignData.featureNotes || {})[key];
+                        if (!value) return null;
+                        return (
+                          <div key={key} className="panel-row" style={{ alignItems: 'flex-start' }}>
+                            <span className="panel-row-label">{key}</span>
+                            <span className="panel-row-value" style={{ whiteSpace: 'pre-wrap' }}>{value}</span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-muted text-sm">No notes yet. Click Edit to add some.</p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Original Generated Details (collapsible) - show even without feature type */}
+          {hex.feature?.originalDetails && (
+            <div className="panel">
+              <Accordion title="Original Generated Details" defaultOpen={false}>
+                {/* Show original terrain and feature type */}
+                {(hex.feature.originalTerrainId || hex.feature.originalFeatureType) && (
+                  <div className="mb-2 pb-2" style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    {hex.feature.originalTerrainId && (
+                      <div className="panel-row">
+                        <span className="panel-row-label">Terrain</span>
+                        <span className="panel-row-value">
+                          {allTerrains.find(t => t.id === hex.feature!.originalTerrainId)?.name || hex.feature.originalTerrainId}
+                        </span>
+                      </div>
+                    )}
+                    {hex.feature.originalFeatureType && (
+                      <div className="panel-row">
+                        <span className="panel-row-label">Feature Type</span>
+                        <span className="panel-row-value">
+                          {hex.feature.originalFeatureType.charAt(0).toUpperCase() + hex.feature.originalFeatureType.slice(1)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <pre className="text-sm text-muted" style={{
+                  whiteSpace: 'pre-wrap',
+                  fontFamily: 'inherit',
+                  margin: 0,
+                  lineHeight: 1.5
+                }}>
+                  {formatGeneratedDetails(hex.feature.originalDetails) || 'No generated details'}
+                </pre>
+              </Accordion>
+            </div>
+          )}
         </>
       )}
       
       {/* Campaign Tab */}
       {activeTab === 'campaign' && (
         <div className="panel">
+          <div className="panel-header">
+            <span className="panel-title">Campaign Notes</span>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setIsEditingCampaignNotes(!isEditingCampaignNotes)}
+              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+            >
+              {isEditingCampaignNotes ? 'Done' : 'Edit'}
+            </button>
+          </div>
           <div className="panel-content">
-            {/* Render all notes */}
-            {noteKeys.map(key => (
-              <div key={key} className="form-group">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="form-label" style={{ marginBottom: 0 }}>{key}</label>
+            {isEditingCampaignNotes ? (
+              <>
+                {/* Edit mode - show textareas */}
+                {noteKeys.map(key => (
+                  <div key={key} className="form-group">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="form-label" style={{ marginBottom: 0 }}>{key}</label>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => handleDeleteNote(key)}
+                        title={`Delete "${key}" note`}
+                        style={{ padding: '2px 6px', fontSize: '0.75rem' }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <textarea
+                      className="form-textarea"
+                      value={(campaignData.notes || {})[key] || ''}
+                      onChange={(e) => handleNoteChange(key, e.target.value)}
+                      placeholder={`Enter ${key.toLowerCase()}...`}
+                      rows={3}
+                    />
+                  </div>
+                ))}
+
+                {/* Empty state */}
+                {noteKeys.length === 0 && !isAddingNote && (
+                  <p className="text-muted text-sm mb-3">No notes yet. Add one below.</p>
+                )}
+
+                {/* Add new note */}
+                {isAddingNote ? (
+                  <div className="form-group">
+                    <label className="form-label">New Note Name</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        className="form-input flex-1"
+                        value={newNoteKey}
+                        onChange={(e) => setNewNoteKey(e.target.value)}
+                        placeholder="e.g., Rumors, NPCs, Treasure..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleAddNote();
+                          if (e.key === 'Escape') {
+                            setIsAddingNote(false);
+                            setNewNoteKey('');
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={handleAddNote}
+                        disabled={!newNoteKey.trim()}
+                      >
+                        Add
+                      </button>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          setIsAddingNote(false);
+                          setNewNoteKey('');
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                   <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => handleDeleteNote(key)}
-                    title={`Delete "${key}" note`}
-                    style={{ padding: '2px 6px', fontSize: '0.75rem' }}
+                    className="btn btn-secondary"
+                    onClick={() => setIsAddingNote(true)}
+                    style={{ width: '100%' }}
                   >
-                    ×
+                    + Add Note
                   </button>
-                </div>
-                <textarea
-                  className="form-textarea"
-                  value={(campaignData.notes || {})[key] || ''}
-                  onChange={(e) => handleNoteChange(key, e.target.value)}
-                  placeholder={`Enter ${key.toLowerCase()}...`}
-                  rows={3}
-                />
-              </div>
-            ))}
-            
-            {/* Empty state */}
-            {noteKeys.length === 0 && !isAddingNote && (
-              <p className="text-muted text-sm mb-3">No notes yet. Add one below.</p>
-            )}
-            
-            {/* Add new note */}
-            {isAddingNote ? (
-              <div className="form-group">
-                <label className="form-label">New Note Name</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    className="form-input flex-1"
-                    value={newNoteKey}
-                    onChange={(e) => setNewNoteKey(e.target.value)}
-                    placeholder="e.g., Rumors, NPCs, Treasure..."
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleAddNote();
-                      if (e.key === 'Escape') {
-                        setIsAddingNote(false);
-                        setNewNoteKey('');
-                      }
-                    }}
-                    autoFocus
-                  />
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={handleAddNote}
-                    disabled={!newNoteKey.trim()}
-                  >
-                    Add
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => {
-                      setIsAddingNote(false);
-                      setNewNoteKey('');
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
+                )}
+              </>
             ) : (
-              <button
-                className="btn btn-secondary"
-                onClick={() => setIsAddingNote(true)}
-                style={{ width: '100%' }}
-              >
-                + Add Note
-              </button>
+              <>
+                {/* View mode - show read-only notes */}
+                {noteKeys.length > 0 ? (
+                  noteKeys.map(key => {
+                    const value = (campaignData.notes || {})[key];
+                    if (!value) return null;
+                    return (
+                      <div key={key} className="panel-row" style={{ alignItems: 'flex-start' }}>
+                        <span className="panel-row-label">{key}</span>
+                        <span className="panel-row-value" style={{ whiteSpace: 'pre-wrap' }}>{value}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-muted text-sm">No notes yet. Click Edit to add some.</p>
+                )}
+              </>
             )}
           </div>
         </div>
       )}
-      
-      {/* Details Tab */}
-      {activeTab === 'details' && (
-        <>
-          {/* Hex Info */}
-          <div className="panel">
-            <div className="panel-header">
-              <span className="panel-title">Hex Info</span>
-            </div>
-            <div className="panel-content">
-              <div className="panel-row">
-                <span className="panel-row-label">Coordinates</span>
-                <span className="panel-row-value" style={{ fontFamily: 'monospace' }}>
-                  {displayCoord} (q:{hex.coord.q}, r:{hex.coord.r})
-                </span>
-              </div>
-              
-              <div className="panel-row">
-                <span className="panel-row-label">Terrain</span>
-                <span className="panel-row-value">{terrain.name}</span>
-              </div>
-              
-              {campaignData.lastVisited && (
-                <div className="panel-row">
-                  <span className="panel-row-label">Last Visited</span>
-                  <span className="panel-row-value">
-                    {new Date(campaignData.lastVisited).toLocaleDateString()}
-                  </span>
-                </div>
-              )}
-              
-              {/* Feature Type selector */}
-              <div className="form-group mt-3">
-                <label className="form-label">Feature Type</label>
-                <select
-                  className="form-select"
-                  value={hex.featureType || ''}
-                  onChange={(e) => handleFeatureTypeChange(e.target.value)}
-                >
-                  <option value="">None</option>
-                  {FEATURE_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-          
-          {/* Feature Details - only show if hex has a feature */}
-          {hex.featureType && hex.feature && (
-            <div className="panel">
-              <div className="panel-header">
-                <span className="panel-title">
-                  {hex.featureType.charAt(0).toUpperCase() + hex.featureType.slice(1)} Details
-                </span>
-              </div>
-              <div className="panel-content">
-                {/* Render feature-specific details */}
-                {renderFeatureDetails(hex.featureType, hex.feature.details, campaignData.featureOverride || {}, handleFeatureOverride)}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-      
+
       {/* Generate Tab */}
       {activeTab === 'generate' && (
         <div className="panel">

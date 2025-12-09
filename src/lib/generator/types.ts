@@ -87,10 +87,18 @@ export interface DomainInfo {
 export interface GeneratedLandmark {
   category: LandmarkCategory;
   subCategory: LandmarkSubCategory;
-  name: string;
+  nature: string;  // The specific landmark type (e.g., "Gazebo", "Fallen tree")
   content: LandmarkContent;
   hasTreasure: boolean;
-  details?: Record<string, string>;
+  // Content-specific details (one of these based on content type)
+  hazard?: string;      // When content is 'hazard'
+  information?: string; // When content is 'empty'
+  special?: string;     // When content is 'special'
+  // Special content sub-details
+  dispute?: string;     // When special is 'Arbitrate a dispute'
+  threat?: string;      // When special is 'Prevent a threat'
+  mystery?: string;     // When special is 'Uncover a mystery'
+  npcProblem?: string;  // When special is 'NPC(s)/Monster(s) in need'
 }
 
 export interface GeneratedSettlement {

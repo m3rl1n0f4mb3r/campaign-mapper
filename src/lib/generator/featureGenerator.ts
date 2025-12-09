@@ -28,7 +28,16 @@ import {
   LAIR_LAYOUT,
   DUNGEON_LEVELS,
 } from './tables/features';
-import { LANDMARK_DETAIL_TABLES, HAZARD_TABLE, EMPTY_INFO_TABLE, SPECIAL_TABLE } from './tables/landmarks';
+import {
+  LANDMARK_DETAIL_TABLES,
+  HAZARD_TABLE,
+  EMPTY_INFO_TABLE,
+  SPECIAL_TABLE,
+  DISPUTES_TABLE,
+  THREATS_TABLE,
+  MYSTERIES_TABLE,
+  NPC_PROBLEMS_TABLE,
+} from './tables/landmarks';
 import { SETTLEMENT_TABLES } from './tables/settlements';
 import { BIOME_ENCOUNTER_TABLES } from './tables/biomes';
 import { generateNameForSettlement } from './nameGenerator';
@@ -130,32 +139,47 @@ export function checkLandmarkTreasure(content: LandmarkContent): boolean {
 export function generateLandmark(): GeneratedLandmark {
   const category = rollLandmarkCategory();
   const subCategory = rollLandmarkSubCategory(category);
-  const name = rollLandmarkName(subCategory);
+  const nature = rollLandmarkName(subCategory); // "Nature" per the Sandbox Generator book
   const content = rollLandmarkContent();
   const hasTreasure = checkLandmarkTreasure(content);
-  
+
   const landmark: GeneratedLandmark = {
     category,
     subCategory,
-    name,
+    nature,
     content,
     hasTreasure,
-    details: {},
   };
-  
-  // Add content-specific details
+
+  // Add content-specific details (flattened for display)
   if (content === 'hazard') {
     const hazardResult = rollOnTable(HAZARD_TABLE);
-    landmark.details!.hazard = hazardResult.value;
+    landmark.hazard = hazardResult.value;
   } else if (content === 'empty') {
     const infoResult = rollOnTable(EMPTY_INFO_TABLE);
-    landmark.details!.information = infoResult.value;
+    landmark.information = infoResult.value;
   } else if (content === 'special') {
     const specialResult = rollOnTable(SPECIAL_TABLE);
-    landmark.details!.special = specialResult.value;
+    landmark.special = specialResult.value;
+
+    // Roll on the appropriate sub-table based on special type
+    if (specialResult.value === 'Arbitrate a dispute') {
+      const disputeResult = rollOnTable(DISPUTES_TABLE);
+      landmark.dispute = disputeResult.value;
+    } else if (specialResult.value === 'Prevent a threat') {
+      const threatResult = rollOnTable(THREATS_TABLE);
+      landmark.threat = threatResult.value;
+    } else if (specialResult.value === 'Uncover a mystery') {
+      const mysteryResult = rollOnTable(MYSTERIES_TABLE);
+      landmark.mystery = mysteryResult.value;
+    } else if (specialResult.value === 'NPC(s)/Monster(s) in need') {
+      const problemResult = rollOnTable(NPC_PROBLEMS_TABLE);
+      landmark.npcProblem = problemResult.value;
+    }
+    // "Solve a puzzle/riddle" and "Related to landmark" don't have sub-tables
   }
   // For 'monsters', the biome encounter table would be used
-  
+
   return landmark;
 }
 
