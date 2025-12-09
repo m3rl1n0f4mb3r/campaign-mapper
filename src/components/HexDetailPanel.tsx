@@ -160,6 +160,32 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
     return Array.from(tagSet).sort();
   }, [map.hexes]);
 
+  // Collect all unique campaign note keys used across all hexes (for autocomplete)
+  const allUsedCampaignNoteKeys = React.useMemo(() => {
+    const keySet = new Set<string>();
+    for (const h of map.hexes) {
+      if (h.campaignData?.notes) {
+        for (const key of Object.keys(h.campaignData.notes)) {
+          keySet.add(key);
+        }
+      }
+    }
+    return Array.from(keySet).sort();
+  }, [map.hexes]);
+
+  // Collect all unique feature note keys used across all hexes (for autocomplete)
+  const allUsedFeatureNoteKeys = React.useMemo(() => {
+    const keySet = new Set<string>();
+    for (const h of map.hexes) {
+      if (h.campaignData?.featureNotes) {
+        for (const key of Object.keys(h.campaignData.featureNotes)) {
+          keySet.add(key);
+        }
+      }
+    }
+    return Array.from(keySet).sort();
+  }, [map.hexes]);
+
   // Find factions that control this hex
   const hexKey = coordToKey(hex.coord);
   const controllingFactions = factions.filter(f => 
@@ -1086,6 +1112,7 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                             value={newFeatureNoteKey}
                             onChange={(e) => setNewFeatureNoteKey(e.target.value)}
                             placeholder="e.g., Rumors, Secrets, Treasure..."
+                            list="feature-note-key-suggestions"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') handleAddFeatureNote();
                               if (e.key === 'Escape') {
@@ -1095,6 +1122,13 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                             }}
                             autoFocus
                           />
+                          <datalist id="feature-note-key-suggestions">
+                            {allUsedFeatureNoteKeys
+                              .filter(k => !featureNoteKeys.includes(k))
+                              .map(key => (
+                                <option key={key} value={key} />
+                              ))}
+                          </datalist>
                           <button
                             className="btn btn-primary btn-sm"
                             onClick={handleAddFeatureNote}
@@ -1241,6 +1275,7 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                         value={newNoteKey}
                         onChange={(e) => setNewNoteKey(e.target.value)}
                         placeholder="e.g., Rumors, NPCs, Treasure..."
+                        list="campaign-note-key-suggestions"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleAddNote();
                           if (e.key === 'Escape') {
@@ -1250,6 +1285,13 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                         }}
                         autoFocus
                       />
+                      <datalist id="campaign-note-key-suggestions">
+                        {allUsedCampaignNoteKeys
+                          .filter(k => !noteKeys.includes(k))
+                          .map(key => (
+                            <option key={key} value={key} />
+                          ))}
+                      </datalist>
                       <button
                         className="btn btn-primary btn-sm"
                         onClick={handleAddNote}
