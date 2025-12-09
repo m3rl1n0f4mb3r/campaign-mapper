@@ -100,111 +100,14 @@ function formatLabel(key: string): string {
     .replace(/npc/gi, 'NPC');
 }
 
-// Feature detail field definitions by feature type
-interface FeatureField {
-  key: string;
-  label: string;
-  editable?: boolean;
-}
-
-// Settlement type-specific field definitions
-// All fields are editable - user has full control over generated data
-const SETTLEMENT_FIELDS: Record<string, FeatureField[]> = {
-  hamlet: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'building', label: 'Main Building', editable: true },
-    { key: 'layout', label: 'Layout', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'secret', label: 'Secret', editable: true },
-  ],
-  village: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'size', label: 'Size', editable: true },
-    { key: 'layout', label: 'Layout', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'ruler', label: 'Ruler', editable: true },
-    { key: 'occupation', label: 'Additional Occupation', editable: true },
-    { key: 'specialLocation', label: 'Special Location', editable: true },
-    { key: 'defense', label: 'Defense', editable: true },
-    { key: 'notableNpc', label: 'Notable NPC', editable: true },
-    { key: 'secret', label: 'Secret', editable: true },
-    { key: 'event', label: 'Event', editable: true },
-  ],
-  city: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'size', label: 'Size', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'ruler', label: 'Ruler', editable: true },
-    { key: 'occupation', label: 'Main Occupation', editable: true },
-    { key: 'characteristic', label: 'Characteristics', editable: true },
-    { key: 'appearance', label: 'Appearance', editable: true },
-    { key: 'specialLocation', label: 'Special Location', editable: true },
-    { key: 'notableNpc', label: 'Notable NPC', editable: true },
-    { key: 'event', label: 'Event', editable: true },
-  ],
-  castle: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'condition', label: 'Condition', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'keepShape', label: 'Keep Shape', editable: true },
-    { key: 'keepLevels', label: 'Keep Levels', editable: true },
-    { key: 'defense', label: 'Defenses', editable: true },
-    { key: 'wallShape', label: 'Wall Shape', editable: true },
-    { key: 'event', label: 'Event', editable: true },
-  ],
-  tower: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'levels', label: 'Levels', editable: true },
-    { key: 'material', label: 'Material', editable: true },
-    { key: 'shape', label: 'Shape', editable: true },
-    { key: 'topLevel', label: 'Top Level', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-  ],
-  abbey: [
-    { key: 'type', label: 'Type', editable: true },
-    { key: 'size', label: 'Size', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'garden', label: 'Garden', editable: true },
-    { key: 'farming', label: 'Farming', editable: true },
-    { key: 'fame', label: 'Fame', editable: true },
-    { key: 'event', label: 'Event', editable: true },
-  ],
+// Default feature note keys by feature type
+// These provide a starting point; users can add/remove notes freely
+const DEFAULT_FEATURE_NOTE_KEYS: Record<string, string[]> = {
+  settlement: ['Description', 'Notable NPCs', 'Current Events'],
+  landmark: ['Description', 'Contents', 'History'],
+  lair: ['Description', 'Inhabitants', 'Treasure'],
+  dungeon: ['Description', 'Levels', 'History'],
 };
-
-// All fields are editable - user has full control over generated data
-const FEATURE_FIELDS: Record<string, FeatureField[]> = {
-  landmark: [
-    { key: 'category', label: 'Category', editable: true },
-    { key: 'subCategory', label: 'Type', editable: true },
-    { key: 'name', label: 'Landmark', editable: true },
-    { key: 'content', label: 'Content', editable: true },
-    { key: 'hasTreasure', label: 'Has Treasure', editable: true },
-    { key: 'hazard', label: 'Hazard', editable: true },
-    { key: 'information', label: 'Information', editable: true },
-    { key: 'special', label: 'Special', editable: true },
-  ],
-  // Settlement uses SETTLEMENT_FIELDS based on settlement type
-  settlement: [],
-  lair: [
-    { key: 'monsterType', label: 'Monster Type', editable: true },
-    { key: 'layout', label: 'Layout', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-    { key: 'percentOutside', label: '% Outside', editable: true },
-  ],
-  dungeon: [
-    { key: 'levels', label: 'Levels', editable: true },
-    { key: 'disposition', label: 'Disposition', editable: true },
-  ],
-};
-
-// Helper to get fields for a feature, handling settlement sub-types
-function getFeatureFields(featureType: string, details: Record<string, unknown>): FeatureField[] {
-  if (featureType === 'settlement') {
-    const settlementType = details.type as string || 'village';
-    return SETTLEMENT_FIELDS[settlementType] || SETTLEMENT_FIELDS.village;
-  }
-  return FEATURE_FIELDS[featureType] || [];
-}
 
 // Helper to normalize feature data for storage (flattens settlement structure)
 function normalizeFeatureData(
@@ -229,98 +132,18 @@ function normalizeFeatureData(
   };
 }
 
-// Render feature details with editable fields
-function renderFeatureDetails(
-  featureType: string,
-  details: Record<string, unknown>,
-  overrides: Record<string, unknown>,
-  onOverride: (key: string, value: string | undefined) => void
-): React.ReactNode {
-  const fields = getFeatureFields(featureType, details);
-  
-  // Collect all keys from details that we have values for
-  const renderedKeys = new Set<string>();
-  const elements: React.ReactNode[] = [];
-  
-  // First render defined fields in order
-  for (const field of fields) {
-    const rawValue = details[field.key];
-    const override = overrides[field.key];
-    
-    // Skip if no value
-    // For editable fields, always show them (even if empty) so user can fill them in
-    // For non-editable fields, skip if no value
-    if (!field.editable && rawValue === undefined && override === undefined) continue;
-    
-    renderedKeys.add(field.key);
-    
-    // Get effective value (override takes precedence)
-    const effectiveValue = override !== undefined ? override : rawValue;
-    
-    // Format value for display
-    let displayValue: string;
-    if (typeof effectiveValue === 'boolean') {
-      displayValue = effectiveValue ? 'Yes' : 'No';
-    } else if (typeof effectiveValue === 'object' && effectiveValue !== null) {
-      // Skip complex objects
-      continue;
-    } else {
-      displayValue = String(effectiveValue ?? '');
-    }
-    
-    if (field.editable) {
-      elements.push(
-        <div key={field.key} className="form-group" style={{ marginBottom: 'var(--spacing-sm)' }}>
-          <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '2px' }}>
-            {field.label}
-            {override !== undefined && (
-              <span className="text-muted" style={{ marginLeft: '0.5rem', fontSize: '0.65rem' }}>(edited)</span>
-            )}
-          </label>
-          <input
-            type="text"
-            className="form-input"
-            value={override !== undefined ? String(override) : displayValue}
-            onChange={(e) => onOverride(field.key, e.target.value || undefined)}
-            placeholder={String(rawValue ?? `Enter ${field.label.toLowerCase()}...`)}
-            style={{ fontSize: '0.85rem' }}
-          />
-        </div>
-      );
-    } else {
-      elements.push(
-        <div key={field.key} className="panel-row">
-          <span className="panel-row-label">{field.label}</span>
-          <span className="panel-row-value">{displayValue}</span>
-        </div>
-      );
-    }
-  }
-  
-  // Then render any additional fields from details that weren't in our definitions
+// Helper to format generated feature details for display in collapsed section
+function formatGeneratedDetails(details: Record<string, unknown>): string {
+  const lines: string[] = [];
   for (const [key, value] of Object.entries(details)) {
-    if (renderedKeys.has(key)) continue;
     if (value === undefined || value === null || value === '') continue;
     if (key === 'details') continue; // Skip nested details object
-    
-    // Skip complex objects
-    if (typeof value === 'object') continue;
-    
+    if (typeof value === 'object') continue; // Skip complex objects
+
     const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
-    
-    elements.push(
-      <div key={key} className="panel-row">
-        <span className="panel-row-label">{formatLabel(key)}</span>
-        <span className="panel-row-value">{displayValue}</span>
-      </div>
-    );
+    lines.push(`${formatLabel(key)}: ${displayValue}`);
   }
-  
-  if (elements.length === 0) {
-    return <p className="text-muted text-sm">No details generated</p>;
-  }
-  
-  return <>{elements}</>;
+  return lines.join('\n');
 }
 
 // Default note keys that are shown initially (can be deleted by user)
@@ -349,6 +172,10 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   // Notes state
   const [newNoteKey, setNewNoteKey] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
+
+  // Feature notes state
+  const [newFeatureNoteKey, setNewFeatureNoteKey] = useState('');
+  const [isAddingFeatureNote, setIsAddingFeatureNote] = useState(false);
   
   // Generator state
   const [forceBiome, setForceBiome] = useState<BiomeType>('grassland');
@@ -499,29 +326,21 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
     }
   }, [hex.coord, hex.campaignData?.name, hex.feature, map.factions, onAddFaction]);
   
-  // Feature override handler
-  const handleFeatureOverride = useCallback((key: string, value: string | undefined) => {
-    const currentOverrides = campaignData.featureOverride || {};
-    if (value === undefined || value === '') {
-      // Remove the override
-      const { [key]: _, ...rest } = currentOverrides;
-      onUpdate({ featureOverride: Object.keys(rest).length > 0 ? rest : undefined });
-    } else {
-      onUpdate({ featureOverride: { ...currentOverrides, [key]: value } });
-    }
-  }, [campaignData.featureOverride, onUpdate]);
-  
   // Feature type change handler
   const handleFeatureTypeChange = useCallback((newType: string) => {
     if (newType === '') {
       // Remove feature entirely
-      onHexUpdate(hex.coord, { 
-        featureType: undefined, 
+      onHexUpdate(hex.coord, {
+        featureType: undefined,
         feature: undefined,
       });
-      // Also clear feature overrides
-      if (campaignData.featureOverride) {
-        onUpdate({ featureOverride: undefined });
+      // Also clear feature-related campaign data
+      const updates: Partial<HexCampaignData> = {};
+      if (campaignData.featureOverride) updates.featureOverride = undefined;
+      if (campaignData.featureNotes) updates.featureNotes = undefined;
+      if (campaignData.deletedFeatureNotes) updates.deletedFeatureNotes = undefined;
+      if (Object.keys(updates).length > 0) {
+        onUpdate(updates);
       }
     } else if (newType !== hex.featureType) {
       // Change to a different feature type - create empty feature structure
@@ -533,12 +352,16 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
           details: { type: featureType },
         },
       });
-      // Clear old feature overrides since they may not apply to new type
-      if (campaignData.featureOverride) {
-        onUpdate({ featureOverride: undefined });
+      // Clear old feature-related campaign data since they may not apply to new type
+      const updates: Partial<HexCampaignData> = {};
+      if (campaignData.featureOverride) updates.featureOverride = undefined;
+      if (campaignData.featureNotes) updates.featureNotes = undefined;
+      if (campaignData.deletedFeatureNotes) updates.deletedFeatureNotes = undefined;
+      if (Object.keys(updates).length > 0) {
+        onUpdate(updates);
       }
     }
-  }, [hex.coord, hex.featureType, campaignData.featureOverride, onHexUpdate, onUpdate]);
+  }, [hex.coord, hex.featureType, campaignData.featureOverride, campaignData.featureNotes, campaignData.deletedFeatureNotes, onHexUpdate, onUpdate]);
   
   // Notes handlers
   const handleNoteChange = useCallback((key: string, value: string) => {
@@ -610,7 +433,77 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
     
     return sorted;
   }, [campaignData.notes, campaignData.deletedNotes]);
-  
+
+  // Feature notes handlers
+  const handleFeatureNoteChange = useCallback((key: string, value: string) => {
+    const currentNotes = campaignData.featureNotes || {};
+    onUpdate({ featureNotes: { ...currentNotes, [key]: value } });
+  }, [campaignData.featureNotes, onUpdate]);
+
+  const handleDeleteFeatureNote = useCallback((key: string) => {
+    const currentNotes = campaignData.featureNotes || {};
+    const { [key]: _, ...rest } = currentNotes;
+
+    // Get default keys for current feature type
+    const defaultKeys = hex.featureType ? (DEFAULT_FEATURE_NOTE_KEYS[hex.featureType] || []) : [];
+    const isDefaultNote = defaultKeys.includes(key);
+    const currentDeleted = campaignData.deletedFeatureNotes || [];
+
+    const updates: Partial<HexCampaignData> = {
+      featureNotes: Object.keys(rest).length > 0 ? rest : undefined,
+    };
+
+    // If deleting a default note, add it to deletedFeatureNotes so it doesn't come back
+    if (isDefaultNote && !currentDeleted.includes(key)) {
+      updates.deletedFeatureNotes = [...currentDeleted, key];
+    }
+
+    onUpdate(updates);
+  }, [hex.featureType, campaignData.featureNotes, campaignData.deletedFeatureNotes, onUpdate]);
+
+  const handleAddFeatureNote = useCallback(() => {
+    if (!newFeatureNoteKey.trim()) return;
+    const key = newFeatureNoteKey.trim();
+    const currentNotes = campaignData.featureNotes || {};
+    // Don't overwrite existing notes
+    if (!(key in currentNotes)) {
+      onUpdate({ featureNotes: { ...currentNotes, [key]: '' } });
+    }
+    setNewFeatureNoteKey('');
+    setIsAddingFeatureNote(false);
+  }, [newFeatureNoteKey, campaignData.featureNotes, onUpdate]);
+
+  // Get all feature note keys: existing notes + default keys for this feature type (unless explicitly deleted)
+  const featureNoteKeys = React.useMemo(() => {
+    if (!hex.featureType) return [];
+
+    const existing = Object.keys(campaignData.featureNotes || {});
+    const deleted = new Set(campaignData.deletedFeatureNotes || []);
+    const allKeys = new Set(existing);
+
+    // Add default keys for this feature type unless they've been explicitly deleted
+    const defaultKeys = DEFAULT_FEATURE_NOTE_KEYS[hex.featureType] || [];
+    defaultKeys.forEach(k => {
+      if (!deleted.has(k)) {
+        allKeys.add(k);
+      }
+    });
+
+    // Sort: defaults first (in order), then custom notes alphabetically
+    const sorted = Array.from(allKeys).sort((a, b) => {
+      const aIsDefault = defaultKeys.includes(a);
+      const bIsDefault = defaultKeys.includes(b);
+      if (aIsDefault && bIsDefault) {
+        return defaultKeys.indexOf(a) - defaultKeys.indexOf(b);
+      }
+      if (aIsDefault) return -1;
+      if (bIsDefault) return 1;
+      return a.localeCompare(b);
+    });
+
+    return sorted;
+  }, [hex.featureType, campaignData.featureNotes, campaignData.deletedFeatureNotes]);
+
   // Faction territory handlers
   const handleAddToFaction = useCallback((factionId: string) => {
     const faction = factions.find(f => f.id === factionId);
@@ -1193,17 +1086,108 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
           
           {/* Feature Details - only show if hex has a feature */}
           {hex.featureType && hex.feature && (
-            <div className="panel">
-              <div className="panel-header">
-                <span className="panel-title">
-                  {hex.featureType.charAt(0).toUpperCase() + hex.featureType.slice(1)} Details
-                </span>
+            <>
+              {/* Feature Notes */}
+              <div className="panel">
+                <div className="panel-header">
+                  <span className="panel-title">
+                    {hex.featureType.charAt(0).toUpperCase() + hex.featureType.slice(1)} Notes
+                  </span>
+                </div>
+                <div className="panel-content">
+                  {/* Render all feature notes */}
+                  {featureNoteKeys.map(key => (
+                    <div key={key} className="form-group">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="form-label" style={{ marginBottom: 0 }}>{key}</label>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => handleDeleteFeatureNote(key)}
+                          title={`Delete "${key}" note`}
+                          style={{ padding: '2px 6px', fontSize: '0.75rem' }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <textarea
+                        className="form-textarea"
+                        value={(campaignData.featureNotes || {})[key] || ''}
+                        onChange={(e) => handleFeatureNoteChange(key, e.target.value)}
+                        placeholder={`Enter ${key.toLowerCase()}...`}
+                        rows={3}
+                      />
+                    </div>
+                  ))}
+
+                  {/* Empty state */}
+                  {featureNoteKeys.length === 0 && !isAddingFeatureNote && (
+                    <p className="text-muted text-sm mb-3">No notes yet. Add one below.</p>
+                  )}
+
+                  {/* Add new feature note */}
+                  {isAddingFeatureNote ? (
+                    <div className="form-group">
+                      <label className="form-label">New Note Name</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          className="form-input flex-1"
+                          value={newFeatureNoteKey}
+                          onChange={(e) => setNewFeatureNoteKey(e.target.value)}
+                          placeholder="e.g., Rumors, Secrets, Treasure..."
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleAddFeatureNote();
+                            if (e.key === 'Escape') {
+                              setIsAddingFeatureNote(false);
+                              setNewFeatureNoteKey('');
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={handleAddFeatureNote}
+                          disabled={!newFeatureNoteKey.trim()}
+                        >
+                          Add
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            setIsAddingFeatureNote(false);
+                            setNewFeatureNoteKey('');
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => setIsAddingFeatureNote(true)}
+                      style={{ width: '100%' }}
+                    >
+                      + Add Note
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="panel-content">
-                {/* Render feature-specific details */}
-                {renderFeatureDetails(hex.featureType, hex.feature.details, campaignData.featureOverride || {}, handleFeatureOverride)}
+
+              {/* Generated Details (collapsible) */}
+              <div className="panel">
+                <Accordion title="Generated Details" defaultOpen={false}>
+                  <pre className="text-sm text-muted" style={{
+                    whiteSpace: 'pre-wrap',
+                    fontFamily: 'inherit',
+                    margin: 0,
+                    lineHeight: 1.5
+                  }}>
+                    {formatGeneratedDetails(hex.feature.details) || 'No generated details'}
+                  </pre>
+                </Accordion>
               </div>
-            </div>
+            </>
           )}
         </>
       )}

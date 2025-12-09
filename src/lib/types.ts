@@ -83,20 +83,25 @@ export interface HexCampaignData {
   // Core campaign fields
   name?: string;
   tags?: string[];
-  
+
   // Arbitrary notes - key-value pairs for user content
   // Users can add/remove any notes they want
   notes?: Record<string, string>;
   // Track which default notes the user has explicitly deleted
   deletedNotes?: string[];
-  
+
+  // Feature notes - separate from campaign notes, tied to the hex's feature
+  featureNotes?: Record<string, string>;
+  // Track which default feature notes the user has explicitly deleted
+  deletedFeatureNotes?: string[];
+
   // Overrides
   terrainOverride?: string;          // Override detected/generated terrain
   featureOverride?: Record<string, unknown>;
-  
+
   // Custom user-defined fields (for programmatic use)
   customFields?: Record<string, string | number | boolean>;
-  
+
   // State tracking
   explored?: boolean;
   hidden?: boolean;
