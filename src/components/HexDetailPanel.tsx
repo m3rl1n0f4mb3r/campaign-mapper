@@ -44,7 +44,6 @@ interface HexDetailPanelProps {
   gridConfig: GridConfig;
   map: CampaignMap;
   factions: Faction[];
-  availableTags: string[];
   customTerrainTypes: TerrainType[];
   onUpdate: (updates: Partial<HexCampaignData>) => void;
   onTerrainChange: (terrainId: string) => void;
@@ -56,7 +55,7 @@ interface HexDetailPanelProps {
   onClose: () => void;
 }
 
-type TabId = 'overview' | 'campaign' | 'details' | 'generate';
+type TabId = 'overview' | 'campaign' | 'generate';
 
 // Generator constants
 const BIOME_OPTIONS: { value: BiomeType; label: string }[] = [
@@ -101,7 +100,6 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   gridConfig,
   map,
   factions,
-  availableTags,
   customTerrainTypes,
   onUpdate,
   onTerrainChange,
@@ -118,10 +116,16 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   // Notes state
   const [newNoteKey, setNewNoteKey] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [isEditingCampaignNotes, setIsEditingCampaignNotes] = useState(false);
 
   // Feature notes state
   const [newFeatureNoteKey, setNewFeatureNoteKey] = useState('');
   const [isAddingFeatureNote, setIsAddingFeatureNote] = useState(false);
+  const [isEditingFeatureNotes, setIsEditingFeatureNotes] = useState(false);
+
+  // Overview edit mode state
+  const [isEditingOverview, setIsEditingOverview] = useState(false);
+  const [isEditingTags, setIsEditingTags] = useState(false);
   
   // Generator state
   const [forceBiome, setForceBiome] = useState<BiomeType>('grassland');
@@ -142,7 +146,20 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   const effectiveTerrain = getEffectiveTerrain(hex);
   const terrain = getTerrainInfo(effectiveTerrain, customTerrainTypes);
   const allTerrains = [...DEFAULT_TERRAIN_TYPES, ...customTerrainTypes];
-  
+
+  // Collect all unique tags used across all hexes in the map (for autocomplete)
+  const allUsedTags = React.useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const h of map.hexes) {
+      if (h.campaignData?.tags) {
+        for (const tag of h.campaignData.tags) {
+          tagSet.add(tag);
+        }
+      }
+    }
+    return Array.from(tagSet).sort();
+  }, [map.hexes]);
+
   // Find factions that control this hex
   const hexKey = coordToKey(hex.coord);
   const controllingFactions = factions.filter(f => 
@@ -705,12 +722,6 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
           Campaign
         </button>
         <button
-          className={`tab ${activeTab === 'details' ? 'active' : ''}`}
-          onClick={() => setActiveTab('details')}
-        >
-          Details
-        </button>
-        <button
           className={`tab ${activeTab === 'generate' ? 'active' : ''}`}
           onClick={() => setActiveTab('generate')}
         >
@@ -723,91 +734,178 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
         <>
           {/* Quick Info */}
           <div className="panel">
+            <div className="panel-header">
+              <span className="panel-title">Quick Info</span>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setIsEditingOverview(!isEditingOverview)}
+                style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+              >
+                {isEditingOverview ? 'Done' : 'Edit'}
+              </button>
+            </div>
             <div className="panel-content">
-              {/* Name */}
-              <div className="form-group">
-                <label className="form-label">Name</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={campaignData.name || ''}
-                  onChange={(e) => handleFieldChange('name', e.target.value)}
-                  placeholder="Give this hex a name..."
-                />
-              </div>
-              
-              {/* Terrain */}
-              <div className="form-group">
-                <label className="form-label">Terrain</label>
-                <select
-                  className="form-select"
-                  value={effectiveTerrain}
-                  onChange={(e) => onTerrainChange(e.target.value)}
-                >
-                  {allTerrains.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Explored */}
-              <div className="panel-row">
-                <span className="panel-row-label">Explored</span>
-                <button
-                  className={`btn btn-sm ${campaignData.explored ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={handleToggleExplored}
-                >
-                  {campaignData.explored ? 'Yes' : 'No'}
-                </button>
-              </div>
-              
-              {/* Factions */}
-              <div className="mt-3">
-                <label className="form-label">Controlled By</label>
-                {controllingFactions.length === 0 ? (
-                  <p className="text-sm text-muted">No faction controls this hex</p>
-                ) : (
-                  <div className="flex flex-col gap-1 mb-2">
-                    {controllingFactions.map(f => (
-                      <div key={f.id} className="faction-control-item">
-                        <span 
-                          className="color-dot"
-                          style={{ backgroundColor: f.color }}
-                        />
-                        <span className="text-sm flex-1">{f.name}</span>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => handleRemoveFromFaction(f.id)}
-                          title="Remove from faction"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
+              {isEditingOverview ? (
+                <>
+                  {/* Edit mode */}
+                  {/* Name */}
+                  <div className="form-group">
+                    <label className="form-label">Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={campaignData.name || ''}
+                      onChange={(e) => handleFieldChange('name', e.target.value)}
+                      placeholder="Give this hex a name..."
+                    />
                   </div>
-                )}
-                
-                {/* Add to faction dropdown */}
-                {factions.filter(f => !controllingFactions.some(cf => cf.id === f.id)).length > 0 && (
-                  <select
-                    className="form-select"
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        handleAddToFaction(e.target.value);
-                        e.target.value = '';
-                      }
-                    }}
-                  >
-                    <option value="">Add to faction...</option>
-                    {factions
-                      .filter(f => !controllingFactions.some(cf => cf.id === f.id))
-                      .map(f => (
-                        <option key={f.id} value={f.id}>{f.name}</option>
+
+                  {/* Terrain */}
+                  <div className="form-group">
+                    <label className="form-label">Terrain</label>
+                    <select
+                      className="form-select"
+                      value={effectiveTerrain}
+                      onChange={(e) => onTerrainChange(e.target.value)}
+                    >
+                      {allTerrains.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
-                  </select>
-                )}
-              </div>
+                    </select>
+                  </div>
+
+                  {/* Explored */}
+                  <div className="panel-row">
+                    <span className="panel-row-label">Explored</span>
+                    <button
+                      className={`btn btn-sm ${campaignData.explored ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={handleToggleExplored}
+                    >
+                      {campaignData.explored ? 'Yes' : 'No'}
+                    </button>
+                  </div>
+
+                  {/* Feature Type selector */}
+                  <div className="form-group mt-3">
+                    <label className="form-label">Feature Type</label>
+                    <select
+                      className="form-select"
+                      value={hex.featureType || ''}
+                      onChange={(e) => handleFeatureTypeChange(e.target.value)}
+                    >
+                      <option value="">None</option>
+                      {FEATURE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Factions */}
+                  <div className="mt-3">
+                    <label className="form-label">Controlled By</label>
+                    {controllingFactions.length === 0 ? (
+                      <p className="text-sm text-muted">No faction controls this hex</p>
+                    ) : (
+                      <div className="flex flex-col gap-1 mb-2">
+                        {controllingFactions.map(f => (
+                          <div key={f.id} className="faction-control-item">
+                            <span
+                              className="color-dot"
+                              style={{ backgroundColor: f.color }}
+                            />
+                            <span className="text-sm flex-1">{f.name}</span>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => handleRemoveFromFaction(f.id)}
+                              title="Remove from faction"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add to faction dropdown */}
+                    {factions.filter(f => !controllingFactions.some(cf => cf.id === f.id)).length > 0 && (
+                      <select
+                        className="form-select"
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAddToFaction(e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                      >
+                        <option value="">Add to faction...</option>
+                        {factions
+                          .filter(f => !controllingFactions.some(cf => cf.id === f.id))
+                          .map(f => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                      </select>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* View mode */}
+                  <div className="panel-row">
+                    <span className="panel-row-label">Name</span>
+                    <span className="panel-row-value">{campaignData.name || '—'}</span>
+                  </div>
+
+                  <div className="panel-row">
+                    <span className="panel-row-label">Terrain</span>
+                    <span className="panel-row-value">{terrain.name}</span>
+                  </div>
+
+                  <div className="panel-row">
+                    <span className="panel-row-label">Explored</span>
+                    <span className="panel-row-value">{campaignData.explored ? 'Yes' : 'No'}</span>
+                  </div>
+
+                  {hex.featureType && (
+                    <div className="panel-row">
+                      <span className="panel-row-label">Feature</span>
+                      <span className="panel-row-value">
+                        {hex.featureType.charAt(0).toUpperCase() + hex.featureType.slice(1)}
+                      </span>
+                    </div>
+                  )}
+
+                  {campaignData.lastVisited && (
+                    <div className="panel-row">
+                      <span className="panel-row-label">Last Visited</span>
+                      <span className="panel-row-value">
+                        {new Date(campaignData.lastVisited).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="panel-row" style={{ alignItems: 'flex-start' }}>
+                    <span className="panel-row-label">Controlled By</span>
+                    <span className="panel-row-value">
+                      {controllingFactions.length === 0 ? (
+                        '—'
+                      ) : (
+                        <span className="flex flex-col gap-1">
+                          {controllingFactions.map(f => (
+                            <span key={f.id} className="flex items-center gap-1">
+                              <span
+                                className="color-dot"
+                                style={{ backgroundColor: f.color }}
+                              />
+                              {f.name}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
           
@@ -815,47 +913,82 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
           <div className="panel">
             <div className="panel-header">
               <span className="panel-title">Tags</span>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setIsEditingTags(!isEditingTags)}
+                style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+              >
+                {isEditingTags ? 'Done' : 'Edit'}
+              </button>
             </div>
             <div className="panel-content">
-              <div className="tags-container mb-2">
-                {(campaignData.tags || []).length === 0 ? (
-                  <span className="text-muted text-sm">No tags</span>
-                ) : (
-                  (campaignData.tags || []).map(tag => (
-                    <span key={tag} className={`tag tag-${tag}`}>
-                      {tag}
-                      <span 
-                        className="tag-remove" 
-                        onClick={() => handleRemoveTag(tag)}
-                      >
-                        ×
-                      </span>
-                    </span>
-                  ))
-                )}
-              </div>
-              
-              <div className="flex gap-2">
-                <select
-                  className="form-select"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                >
-                  <option value="">Add tag...</option>
-                  {availableTags
-                    .filter(t => !(campaignData.tags || []).includes(t))
-                    .map(tag => (
-                      <option key={tag} value={tag}>{tag}</option>
-                    ))}
-                </select>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => handleAddTag(newTag)}
-                  disabled={!newTag}
-                >
-                  Add
-                </button>
-              </div>
+              {isEditingTags ? (
+                <>
+                  {/* Edit mode - show tags with remove buttons and add functionality */}
+                  <div className="tags-container mb-2">
+                    {(campaignData.tags || []).length === 0 ? (
+                      <span className="text-muted text-sm">No tags</span>
+                    ) : (
+                      (campaignData.tags || []).map(tag => (
+                        <span key={tag} className={`tag tag-${tag}`}>
+                          {tag}
+                          <span
+                            className="tag-remove"
+                            onClick={() => handleRemoveTag(tag)}
+                          >
+                            ×
+                          </span>
+                        </span>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      className="form-input flex-1"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newTag.trim()) {
+                          handleAddTag(newTag.trim());
+                        }
+                      }}
+                      placeholder="Type a tag..."
+                      list="tag-suggestions"
+                    />
+                    <datalist id="tag-suggestions">
+                      {allUsedTags
+                        .filter(t => !(campaignData.tags || []).includes(t))
+                        .map(tag => (
+                          <option key={tag} value={tag} />
+                        ))}
+                    </datalist>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleAddTag(newTag.trim())}
+                      disabled={!newTag.trim()}
+                    >
+                      Add
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* View mode - show tags without edit controls */}
+                  <div className="tags-container">
+                    {(campaignData.tags || []).length === 0 ? (
+                      <span className="text-muted text-sm">No tags</span>
+                    ) : (
+                      (campaignData.tags || []).map(tag => (
+                        <span key={tag} className={`tag tag-${tag}`}>
+                          {tag}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
           
@@ -868,13 +1001,13 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
               <div className="neighbors-grid">
                 {neighbors.map(neighbor => {
                   const nTerrain = getTerrainInfo(
-                    getEffectiveTerrain(neighbor), 
+                    getEffectiveTerrain(neighbor),
                     customTerrainTypes
                   );
                   const hasData = hexHasUserData(neighbor);
                   const { col: nCol, row: nRow } = axialToOffset(neighbor.coord, gridConfig);
                   const nDisplayCoord = `${String(nCol).padStart(2, '0')}${String(nRow).padStart(2, '0')}`;
-                  
+
                   return (
                     <div
                       key={`${neighbor.coord.q},${neighbor.coord.r}`}
@@ -894,238 +1027,123 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
               </div>
             </div>
           </div>
-        </>
-      )}
-      
-      {/* Campaign Tab */}
-      {activeTab === 'campaign' && (
-        <div className="panel">
-          <div className="panel-content">
-            {/* Render all notes */}
-            {noteKeys.map(key => (
-              <div key={key} className="form-group">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="form-label" style={{ marginBottom: 0 }}>{key}</label>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => handleDeleteNote(key)}
-                    title={`Delete "${key}" note`}
-                    style={{ padding: '2px 6px', fontSize: '0.75rem' }}
-                  >
-                    ×
-                  </button>
-                </div>
-                <textarea
-                  className="form-textarea"
-                  value={(campaignData.notes || {})[key] || ''}
-                  onChange={(e) => handleNoteChange(key, e.target.value)}
-                  placeholder={`Enter ${key.toLowerCase()}...`}
-                  rows={3}
-                />
-              </div>
-            ))}
-            
-            {/* Empty state */}
-            {noteKeys.length === 0 && !isAddingNote && (
-              <p className="text-muted text-sm mb-3">No notes yet. Add one below.</p>
-            )}
-            
-            {/* Add new note */}
-            {isAddingNote ? (
-              <div className="form-group">
-                <label className="form-label">New Note Name</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    className="form-input flex-1"
-                    value={newNoteKey}
-                    onChange={(e) => setNewNoteKey(e.target.value)}
-                    placeholder="e.g., Rumors, NPCs, Treasure..."
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleAddNote();
-                      if (e.key === 'Escape') {
-                        setIsAddingNote(false);
-                        setNewNoteKey('');
-                      }
-                    }}
-                    autoFocus
-                  />
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={handleAddNote}
-                    disabled={!newNoteKey.trim()}
-                  >
-                    Add
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => {
-                      setIsAddingNote(false);
-                      setNewNoteKey('');
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                className="btn btn-secondary"
-                onClick={() => setIsAddingNote(true)}
-                style={{ width: '100%' }}
-              >
-                + Add Note
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-      
-      {/* Details Tab */}
-      {activeTab === 'details' && (
-        <>
-          {/* Hex Info */}
-          <div className="panel">
-            <div className="panel-header">
-              <span className="panel-title">Hex Info</span>
-            </div>
-            <div className="panel-content">
-              <div className="panel-row">
-                <span className="panel-row-label">Coordinates</span>
-                <span className="panel-row-value" style={{ fontFamily: 'monospace' }}>
-                  {displayCoord} (q:{hex.coord.q}, r:{hex.coord.r})
-                </span>
-              </div>
-              
-              <div className="panel-row">
-                <span className="panel-row-label">Terrain</span>
-                <span className="panel-row-value">{terrain.name}</span>
-              </div>
 
-              {campaignData.name && (
-                <div className="panel-row">
-                  <span className="panel-row-label">Name</span>
-                  <span className="panel-row-value">{campaignData.name}</span>
-                </div>
-              )}
-
-              {campaignData.lastVisited && (
-                <div className="panel-row">
-                  <span className="panel-row-label">Last Visited</span>
-                  <span className="panel-row-value">
-                    {new Date(campaignData.lastVisited).toLocaleDateString()}
-                  </span>
-                </div>
-              )}
-              
-              {/* Feature Type selector */}
-              <div className="form-group mt-3">
-                <label className="form-label">Feature Type</label>
-                <select
-                  className="form-select"
-                  value={hex.featureType || ''}
-                  onChange={(e) => handleFeatureTypeChange(e.target.value)}
-                >
-                  <option value="">None</option>
-                  {FEATURE_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-          
-          {/* Feature Details - only show if hex has a feature */}
+          {/* Feature Notes - only show if hex has a feature */}
           {hex.featureType && hex.feature && (
-            <>
-              {/* Feature Notes */}
-              <div className="panel">
-                <div className="panel-header">
-                  <span className="panel-title">
-                    {hex.featureType.charAt(0).toUpperCase() + hex.featureType.slice(1)} Notes
-                  </span>
-                </div>
-                <div className="panel-content">
-                  {/* Render all feature notes */}
-                  {featureNoteKeys.map(key => (
-                    <div key={key} className="form-group">
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="form-label" style={{ marginBottom: 0 }}>{key}</label>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => handleDeleteFeatureNote(key)}
-                          title={`Delete "${key}" note`}
-                          style={{ padding: '2px 6px', fontSize: '0.75rem' }}
-                        >
-                          ×
-                        </button>
+            <div className="panel">
+              <div className="panel-header">
+                <span className="panel-title">
+                  {hex.featureType.charAt(0).toUpperCase() + hex.featureType.slice(1)} Notes
+                </span>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setIsEditingFeatureNotes(!isEditingFeatureNotes)}
+                  style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                >
+                  {isEditingFeatureNotes ? 'Done' : 'Edit'}
+                </button>
+              </div>
+              <div className="panel-content">
+                {isEditingFeatureNotes ? (
+                  <>
+                    {/* Edit mode - show textareas */}
+                    {featureNoteKeys.map(key => (
+                      <div key={key} className="form-group">
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="form-label" style={{ marginBottom: 0 }}>{key}</label>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => handleDeleteFeatureNote(key)}
+                            title={`Delete "${key}" note`}
+                            style={{ padding: '2px 6px', fontSize: '0.75rem' }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <textarea
+                          className="form-textarea"
+                          value={(campaignData.featureNotes || {})[key] || ''}
+                          onChange={(e) => handleFeatureNoteChange(key, e.target.value)}
+                          placeholder={`Enter ${key.toLowerCase()}...`}
+                          rows={3}
+                        />
                       </div>
-                      <textarea
-                        className="form-textarea"
-                        value={(campaignData.featureNotes || {})[key] || ''}
-                        onChange={(e) => handleFeatureNoteChange(key, e.target.value)}
-                        placeholder={`Enter ${key.toLowerCase()}...`}
-                        rows={3}
-                      />
-                    </div>
-                  ))}
+                    ))}
 
-                  {/* Empty state */}
-                  {featureNoteKeys.length === 0 && !isAddingFeatureNote && (
-                    <p className="text-muted text-sm mb-3">No notes yet. Add one below.</p>
-                  )}
+                    {/* Empty state */}
+                    {featureNoteKeys.length === 0 && !isAddingFeatureNote && (
+                      <p className="text-muted text-sm mb-3">No notes yet. Add one below.</p>
+                    )}
 
-                  {/* Add new feature note */}
-                  {isAddingFeatureNote ? (
-                    <div className="form-group">
-                      <label className="form-label">New Note Name</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          className="form-input flex-1"
-                          value={newFeatureNoteKey}
-                          onChange={(e) => setNewFeatureNoteKey(e.target.value)}
-                          placeholder="e.g., Rumors, Secrets, Treasure..."
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleAddFeatureNote();
-                            if (e.key === 'Escape') {
+                    {/* Add new feature note */}
+                    {isAddingFeatureNote ? (
+                      <div className="form-group">
+                        <label className="form-label">New Note Name</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            className="form-input flex-1"
+                            value={newFeatureNoteKey}
+                            onChange={(e) => setNewFeatureNoteKey(e.target.value)}
+                            placeholder="e.g., Rumors, Secrets, Treasure..."
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddFeatureNote();
+                              if (e.key === 'Escape') {
+                                setIsAddingFeatureNote(false);
+                                setNewFeatureNoteKey('');
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={handleAddFeatureNote}
+                            disabled={!newFeatureNoteKey.trim()}
+                          >
+                            Add
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
                               setIsAddingFeatureNote(false);
                               setNewFeatureNoteKey('');
-                            }
-                          }}
-                          autoFocus
-                        />
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={handleAddFeatureNote}
-                          disabled={!newFeatureNoteKey.trim()}
-                        >
-                          Add
-                        </button>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => {
-                            setIsAddingFeatureNote(false);
-                            setNewFeatureNoteKey('');
-                          }}
-                        >
-                          Cancel
-                        </button>
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => setIsAddingFeatureNote(true)}
-                      style={{ width: '100%' }}
-                    >
-                      + Add Note
-                    </button>
-                  )}
-                </div>
+                    ) : (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => setIsAddingFeatureNote(true)}
+                        style={{ width: '100%' }}
+                      >
+                        + Add Note
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {/* View mode - show read-only notes */}
+                    {featureNoteKeys.length > 0 ? (
+                      featureNoteKeys.map(key => {
+                        const value = (campaignData.featureNotes || {})[key];
+                        if (!value) return null;
+                        return (
+                          <div key={key} className="panel-row" style={{ alignItems: 'flex-start' }}>
+                            <span className="panel-row-label">{key}</span>
+                            <span className="panel-row-value" style={{ whiteSpace: 'pre-wrap' }}>{value}</span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-muted text-sm">No notes yet. Click Edit to add some.</p>
+                    )}
+                  </>
+                )}
               </div>
-
-            </>
+            </div>
           )}
 
           {/* Original Generated Details (collapsible) - show even without feature type */}
@@ -1167,6 +1185,122 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
         </>
       )}
       
+      {/* Campaign Tab */}
+      {activeTab === 'campaign' && (
+        <div className="panel">
+          <div className="panel-header">
+            <span className="panel-title">Campaign Notes</span>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setIsEditingCampaignNotes(!isEditingCampaignNotes)}
+              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+            >
+              {isEditingCampaignNotes ? 'Done' : 'Edit'}
+            </button>
+          </div>
+          <div className="panel-content">
+            {isEditingCampaignNotes ? (
+              <>
+                {/* Edit mode - show textareas */}
+                {noteKeys.map(key => (
+                  <div key={key} className="form-group">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="form-label" style={{ marginBottom: 0 }}>{key}</label>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => handleDeleteNote(key)}
+                        title={`Delete "${key}" note`}
+                        style={{ padding: '2px 6px', fontSize: '0.75rem' }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <textarea
+                      className="form-textarea"
+                      value={(campaignData.notes || {})[key] || ''}
+                      onChange={(e) => handleNoteChange(key, e.target.value)}
+                      placeholder={`Enter ${key.toLowerCase()}...`}
+                      rows={3}
+                    />
+                  </div>
+                ))}
+
+                {/* Empty state */}
+                {noteKeys.length === 0 && !isAddingNote && (
+                  <p className="text-muted text-sm mb-3">No notes yet. Add one below.</p>
+                )}
+
+                {/* Add new note */}
+                {isAddingNote ? (
+                  <div className="form-group">
+                    <label className="form-label">New Note Name</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        className="form-input flex-1"
+                        value={newNoteKey}
+                        onChange={(e) => setNewNoteKey(e.target.value)}
+                        placeholder="e.g., Rumors, NPCs, Treasure..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleAddNote();
+                          if (e.key === 'Escape') {
+                            setIsAddingNote(false);
+                            setNewNoteKey('');
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={handleAddNote}
+                        disabled={!newNoteKey.trim()}
+                      >
+                        Add
+                      </button>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          setIsAddingNote(false);
+                          setNewNoteKey('');
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setIsAddingNote(true)}
+                    style={{ width: '100%' }}
+                  >
+                    + Add Note
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                {/* View mode - show read-only notes */}
+                {noteKeys.length > 0 ? (
+                  noteKeys.map(key => {
+                    const value = (campaignData.notes || {})[key];
+                    if (!value) return null;
+                    return (
+                      <div key={key} className="panel-row" style={{ alignItems: 'flex-start' }}>
+                        <span className="panel-row-label">{key}</span>
+                        <span className="panel-row-value" style={{ whiteSpace: 'pre-wrap' }}>{value}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-muted text-sm">No notes yet. Click Edit to add some.</p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Generate Tab */}
       {activeTab === 'generate' && (
         <div className="panel">

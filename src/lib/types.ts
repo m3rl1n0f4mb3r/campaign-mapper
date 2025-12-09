@@ -294,18 +294,7 @@ export const DEFAULT_CAMPAIGN_SETTINGS: CampaignSettings = {
   showGrid: true,
   showCoordinates: true,
   hexFillOpacity: 0.5,
-  availableTags: [
-    'explored',
-    'dangerous',
-    'safe',
-    'quest',
-    'treasure',
-    'cleared',
-    'friendly',
-    'hostile',
-    'mystery',
-    'camp',
-  ],
+  availableTags: [], // User-defined tags only
   customTerrainTypes: [],
 };
 

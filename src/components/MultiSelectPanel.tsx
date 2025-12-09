@@ -1,12 +1,12 @@
-import React, { useState, useCallback } from 'react';
-import type { HexCoord, TerrainType, GridConfig } from '@/lib/types';
+import React, { useState, useCallback, useMemo } from 'react';
+import type { HexCoord, TerrainType, GridConfig, CampaignMap } from '@/lib/types';
 import { DEFAULT_TERRAIN_TYPES } from '@/lib/types';
 import { axialToOffset } from '@/lib/hexUtils';
 
 interface MultiSelectPanelProps {
   selectedCoords: HexCoord[];
   gridConfig: GridConfig;
-  availableTags: string[];
+  map: CampaignMap;
   customTerrainTypes: TerrainType[];
   onBulkSetTerrain: (terrainId: string) => void;
   onBulkAddTags: (tags: string[]) => void;
@@ -17,7 +17,7 @@ interface MultiSelectPanelProps {
 const MultiSelectPanel: React.FC<MultiSelectPanelProps> = ({
   selectedCoords,
   gridConfig,
-  availableTags,
+  map,
   customTerrainTypes,
   onBulkSetTerrain,
   onBulkAddTags,
@@ -26,8 +26,21 @@ const MultiSelectPanel: React.FC<MultiSelectPanelProps> = ({
 }) => {
   const [selectedTerrain, setSelectedTerrain] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
-  
+
   const allTerrains = [...DEFAULT_TERRAIN_TYPES, ...customTerrainTypes];
+
+  // Collect all unique tags used across all hexes in the map (for autocomplete)
+  const allUsedTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const h of map.hexes) {
+      if (h.campaignData?.tags) {
+        for (const tag of h.campaignData.tags) {
+          tagSet.add(tag);
+        }
+      }
+    }
+    return Array.from(tagSet).sort();
+  }, [map.hexes]);
   
   const handleApplyTerrain = useCallback(() => {
     if (selectedTerrain) {
@@ -37,8 +50,9 @@ const MultiSelectPanel: React.FC<MultiSelectPanelProps> = ({
   }, [selectedTerrain, onBulkSetTerrain]);
   
   const handleAddTag = useCallback(() => {
-    if (selectedTag) {
-      onBulkAddTags([selectedTag]);
+    const tag = selectedTag.trim();
+    if (tag) {
+      onBulkAddTags([tag]);
       setSelectedTag('');
     }
   }, [selectedTag, onBulkAddTags]);
@@ -112,20 +126,28 @@ const MultiSelectPanel: React.FC<MultiSelectPanelProps> = ({
           <div className="form-group">
             <label className="form-label">Add Tag</label>
             <div className="flex gap-2">
-              <select
-                className="form-select"
+              <input
+                type="text"
+                className="form-input flex-1"
                 value={selectedTag}
                 onChange={e => setSelectedTag(e.target.value)}
-              >
-                <option value="">Select tag...</option>
-                {availableTags.map(tag => (
-                  <option key={tag} value={tag}>{tag}</option>
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && selectedTag.trim()) {
+                    handleAddTag();
+                  }
+                }}
+                placeholder="Type a tag..."
+                list="bulk-tag-suggestions"
+              />
+              <datalist id="bulk-tag-suggestions">
+                {allUsedTags.map(tag => (
+                  <option key={tag} value={tag} />
                 ))}
-              </select>
+              </datalist>
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={handleAddTag}
-                disabled={!selectedTag}
+                disabled={!selectedTag.trim()}
               >
                 Add
               </button>
