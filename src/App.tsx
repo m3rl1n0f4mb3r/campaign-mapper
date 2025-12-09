@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { 
   CampaignMap, 
   HexCoord, 
@@ -9,10 +9,11 @@ import type {
   MapMode,
 } from '@/lib/types';
 import { coordToKey } from '@/lib/types';
-import { 
-  coordEquals, 
-  getNeighbors, 
+import {
+  coordEquals,
+  getNeighbors,
   getHexAt,
+  hexToPixel,
 } from '@/lib/hexUtils';
 import { 
   createMap, 
@@ -53,7 +54,10 @@ function App() {
   const [showMapList, setShowMapList] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [hexListFilter, setHexListFilter] = useState<StatsFilterType | null>(null);
-  
+
+  // Ref for map container (for scrolling to hexes)
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
   // Load last map on mount
   useEffect(() => {
     async function loadLastMap() {
@@ -389,13 +393,36 @@ function App() {
     }
   }, []);
   
+  // Scroll the map to center on a specific hex
+  const scrollToHex = useCallback((coord: HexCoord) => {
+    if (!mapContainerRef.current || !currentMap) return;
+
+    const container = mapContainerRef.current;
+    const { x, y } = hexToPixel(coord, currentMap.gridConfig);
+
+    // Account for zoom level
+    const scaledX = x * zoom;
+    const scaledY = y * zoom;
+
+    // Center the hex in the viewport
+    const scrollX = scaledX - container.clientWidth / 2;
+    const scrollY = scaledY - container.clientHeight / 2;
+
+    container.scrollTo({
+      left: scrollX,
+      top: scrollY,
+      behavior: 'smooth',
+    });
+  }, [currentMap, zoom]);
+
   const handleHexListClick = useCallback((coord: HexCoord) => {
-    // Close hex list and select the clicked hex
+    // Close hex list, select the clicked hex, and scroll to it
     setHexListFilter(null);
     setSelectedCoord(coord);
     setMultiSelectedCoords([]);
     setSidebarView('hex');
-  }, []);
+    scrollToHex(coord);
+  }, [scrollToHex]);
 
 
 
@@ -487,8 +514,10 @@ function App() {
     });
   }, [currentMap]);
   
+  const sidebarOpen = currentMap && sidebarView !== 'none';
+
   return (
-    <div className="app-container">
+    <div className={`app-container ${sidebarOpen ? 'sidebar-open' : ''}`}>
       {/* Main Content */}
       <div className="main-content">
         <Toolbar
@@ -506,7 +535,7 @@ function App() {
           onZoomChange={setZoom}
         />
         
-        <div className="map-container">
+        <div className="map-container" ref={mapContainerRef}>
           {currentMap ? (
             <>
               <HexMap

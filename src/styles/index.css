@@ -1299,10 +1299,12 @@ body {
    HEX LIST PANEL
    ============================================ */
 .hex-list-panel {
-  position: absolute;
+  position: fixed;
   top: 60px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-left: auto;
+  margin-right: auto;
   width: 400px;
   max-width: calc(100vw - 40px);
   max-height: calc(100vh - 100px);
@@ -1313,6 +1315,12 @@ body {
   z-index: 1000;
   display: flex;
   flex-direction: column;
+}
+
+/* Adjust hex list panel position when sidebar is open */
+.sidebar-open .hex-list-panel {
+  right: var(--sidebar-width);
+  max-width: calc(100vw - var(--sidebar-width) - 40px);
 }
 
 .hex-list-panel .panel-header {
