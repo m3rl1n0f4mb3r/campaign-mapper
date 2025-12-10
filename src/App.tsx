@@ -201,7 +201,38 @@ function App() {
       updatedAt: new Date().toISOString(),
     });
   }, [currentMap, multiSelectedCoords]);
-  
+
+  const handleBulkAddToFaction = useCallback((factionId: string) => {
+    if (!currentMap || multiSelectedCoords.length === 0) return;
+
+    const faction = currentMap.factions.find(f => f.id === factionId);
+    if (!faction) return;
+
+    // Get existing domain hex keys
+    const existingKeys = new Set(faction.domainHexes.map(h => coordToKey(h)));
+
+    // Add new coords that aren't already in the domain
+    const newDomainHexes = [...faction.domainHexes];
+    for (const coord of multiSelectedCoords) {
+      const key = coordToKey(coord);
+      if (!existingKeys.has(key)) {
+        newDomainHexes.push(coord);
+        existingKeys.add(key);
+      }
+    }
+
+    const updatedFaction = { ...faction, domainHexes: newDomainHexes };
+    const newFactions = currentMap.factions.map(f =>
+      f.id === factionId ? updatedFaction : f
+    );
+
+    setCurrentMap({
+      ...currentMap,
+      factions: newFactions,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [currentMap, multiSelectedCoords]);
+
   // Settings
   const handleSettingsChange = useCallback((updates: Partial<CampaignSettings>) => {
     if (!currentMap) return;
@@ -614,9 +645,11 @@ function App() {
                 gridConfig={currentMap.gridConfig}
                 map={currentMap}
                 customTerrainTypes={currentMap.settings.customTerrainTypes}
+                factions={currentMap.factions}
                 onBulkSetTerrain={handleBulkSetTerrain}
                 onBulkAddTags={handleBulkAddTags}
                 onBulkSetExplored={handleBulkSetExplored}
+                onBulkAddToFaction={handleBulkAddToFaction}
                 onClearSelection={handleClearSelection}
               />
             )}

@@ -227,19 +227,22 @@ export interface FactionRelationship {
   status: FactionRelationshipStatus;
 }
 
+export type FactionType = 'faction' | 'region';
+
 export interface Faction {
   id: string;
   name: string;
+  type: FactionType;
   color?: string;
   sourceHexCoord: HexCoord;
   domainHexes: HexCoord[];
   relationships: FactionRelationship[];
-  
+
   // Arbitrary notes - key-value pairs for user content
   notes?: Record<string, string>;
   // Track which default notes the user has explicitly deleted
   deletedNotes?: string[];
-  
+
   customFields?: Record<string, string | number | boolean>;
 }
 
