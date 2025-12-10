@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import type { HexCoord, TerrainType, GridConfig, CampaignMap } from '@/lib/types';
+import type { HexCoord, TerrainType, GridConfig, CampaignMap, Faction } from '@/lib/types';
 import { DEFAULT_TERRAIN_TYPES } from '@/lib/types';
 import { axialToOffset } from '@/lib/hexUtils';
 
@@ -8,9 +8,11 @@ interface MultiSelectPanelProps {
   gridConfig: GridConfig;
   map: CampaignMap;
   customTerrainTypes: TerrainType[];
+  factions: Faction[];
   onBulkSetTerrain: (terrainId: string) => void;
   onBulkAddTags: (tags: string[]) => void;
   onBulkSetExplored: (explored: boolean) => void;
+  onBulkAddToFaction: (factionId: string) => void;
   onClearSelection: () => void;
 }
 
@@ -19,13 +21,19 @@ const MultiSelectPanel: React.FC<MultiSelectPanelProps> = ({
   gridConfig,
   map,
   customTerrainTypes,
+  factions,
   onBulkSetTerrain,
   onBulkAddTags,
   onBulkSetExplored,
+  onBulkAddToFaction,
   onClearSelection,
 }) => {
   const [selectedTerrain, setSelectedTerrain] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
+
+  // Separate factions and regions
+  const actualFactions = useMemo(() => factions.filter(f => f.type !== 'region'), [factions]);
+  const regions = useMemo(() => factions.filter(f => f.type === 'region'), [factions]);
 
   const allTerrains = [...DEFAULT_TERRAIN_TYPES, ...customTerrainTypes];
 
@@ -172,6 +180,52 @@ const MultiSelectPanel: React.FC<MultiSelectPanelProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Add to Faction */}
+          {actualFactions.length > 0 && (
+            <div className="form-group">
+              <label className="form-label">Add to Faction</label>
+              <select
+                className="form-select"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onBulkAddToFaction(e.target.value);
+                  }
+                }}
+              >
+                <option value="">Select faction...</option>
+                {actualFactions.map(f => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Add to Region */}
+          {regions.length > 0 && (
+            <div className="form-group">
+              <label className="form-label">Add to Region</label>
+              <select
+                className="form-select"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onBulkAddToFaction(e.target.value);
+                  }
+                }}
+              >
+                <option value="">Select region...</option>
+                {regions.map(r => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
       

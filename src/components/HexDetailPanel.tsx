@@ -186,11 +186,13 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
     return Array.from(keySet).sort();
   }, [map.hexes]);
 
-  // Find factions that control this hex
+  // Find factions and regions that control this hex
   const hexKey = coordToKey(hex.coord);
-  const controllingFactions = factions.filter(f => 
+  const controllingFactions = factions.filter(f =>
     f.domainHexes.some(h => coordToKey(h) === hexKey)
   );
+  const controllingActualFactions = controllingFactions.filter(f => f.type !== 'region');
+  const controllingRegions = controllingFactions.filter(f => f.type === 'region');
   
   // Get display coordinate
   const { col, row } = axialToOffset(hex.coord, gridConfig);
@@ -828,12 +830,12 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
 
                   {/* Factions */}
                   <div className="mt-3">
-                    <label className="form-label">Controlled By</label>
-                    {controllingFactions.length === 0 ? (
+                    <label className="form-label">Factions</label>
+                    {controllingActualFactions.length === 0 ? (
                       <p className="text-sm text-muted">No faction controls this hex</p>
                     ) : (
                       <div className="flex flex-col gap-1 mb-2">
-                        {controllingFactions.map(f => (
+                        {controllingActualFactions.map(f => (
                           <div key={f.id} className="faction-control-item">
                             <span
                               className="color-dot"
@@ -853,7 +855,7 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                     )}
 
                     {/* Add to faction dropdown */}
-                    {factions.filter(f => !controllingFactions.some(cf => cf.id === f.id)).length > 0 && (
+                    {factions.filter(f => f.type !== 'region' && !controllingActualFactions.some(cf => cf.id === f.id)).length > 0 && (
                       <select
                         className="form-select"
                         value=""
@@ -866,9 +868,57 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                       >
                         <option value="">Add to faction...</option>
                         {factions
-                          .filter(f => !controllingFactions.some(cf => cf.id === f.id))
+                          .filter(f => f.type !== 'region' && !controllingActualFactions.some(cf => cf.id === f.id))
                           .map(f => (
                             <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Regions */}
+                  <div className="mt-3">
+                    <label className="form-label">Regions</label>
+                    {controllingRegions.length === 0 ? (
+                      <p className="text-sm text-muted">Not in any region</p>
+                    ) : (
+                      <div className="flex flex-col gap-1 mb-2">
+                        {controllingRegions.map(r => (
+                          <div key={r.id} className="faction-control-item">
+                            <span
+                              className="color-dot"
+                              style={{ backgroundColor: r.color }}
+                            />
+                            <span className="text-sm flex-1">{r.name}</span>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => handleRemoveFromFaction(r.id)}
+                              title="Remove from region"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add to region dropdown */}
+                    {factions.filter(f => f.type === 'region' && !controllingRegions.some(cr => cr.id === f.id)).length > 0 && (
+                      <select
+                        className="form-select"
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAddToFaction(e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                      >
+                        <option value="">Add to region...</option>
+                        {factions
+                          .filter(f => f.type === 'region' && !controllingRegions.some(cr => cr.id === f.id))
+                          .map(r => (
+                            <option key={r.id} value={r.id}>{r.name}</option>
                           ))}
                       </select>
                     )}
@@ -911,19 +961,40 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                   )}
 
                   <div className="panel-row" style={{ alignItems: 'flex-start' }}>
-                    <span className="panel-row-label">Controlled By</span>
+                    <span className="panel-row-label">Factions</span>
                     <span className="panel-row-value">
-                      {controllingFactions.length === 0 ? (
+                      {controllingActualFactions.length === 0 ? (
                         '—'
                       ) : (
                         <span className="flex flex-col gap-1">
-                          {controllingFactions.map(f => (
+                          {controllingActualFactions.map(f => (
                             <span key={f.id} className="flex items-center gap-1">
                               <span
                                 className="color-dot"
                                 style={{ backgroundColor: f.color }}
                               />
                               {f.name}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="panel-row" style={{ alignItems: 'flex-start' }}>
+                    <span className="panel-row-label">Regions</span>
+                    <span className="panel-row-value">
+                      {controllingRegions.length === 0 ? (
+                        '—'
+                      ) : (
+                        <span className="flex flex-col gap-1">
+                          {controllingRegions.map(r => (
+                            <span key={r.id} className="flex items-center gap-1">
+                              <span
+                                className="color-dot"
+                                style={{ backgroundColor: r.color }}
+                              />
+                              {r.name}
                             </span>
                           ))}
                         </span>

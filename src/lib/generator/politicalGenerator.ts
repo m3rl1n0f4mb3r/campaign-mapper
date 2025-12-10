@@ -170,6 +170,7 @@ export function createFactionFromSettlement(
   return {
     id: generateFactionId(),
     name: settlementName,
+    type: 'faction',
     color: factionColor,
     sourceHexCoord: centerCoord,
     domainHexes: domain.hexes,

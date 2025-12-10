@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import type { Faction, FactionRelationshipStatus, Hex, HexCoord, GridConfig, TerrainType } from '@/lib/types';
+import type { Faction, FactionRelationshipStatus, FactionType, Hex, HexCoord, GridConfig, TerrainType } from '@/lib/types';
 import { DEFAULT_TERRAIN_TYPES, getEffectiveTerrain } from '@/lib/types';
 import { generateFactionNameOptions } from '@/lib/generator/nameGenerator';
 import { axialToOffset, getHexAt } from '@/lib/hexUtils';
@@ -93,6 +93,7 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
   // New faction state
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState(FACTION_COLORS[0]);
+  const [newType, setNewType] = useState<FactionType>('faction');
   
   // Notes state
   const [newNoteKey, setNewNoteKey] = useState('');
@@ -136,21 +137,23 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
   
   const handleCreateFaction = useCallback(() => {
     if (!newName.trim()) return;
-    
+
     const faction: Faction = {
       id: generateFactionId(),
       name: newName.trim(),
+      type: newType,
       color: newColor,
       sourceHexCoord: { q: 0, r: 0 }, // Will be set when assigning territory
       domainHexes: [],
       relationships: [],
     };
-    
+
     onAddFaction(faction);
     setNewName('');
+    setNewType('faction');
     setGeneratedNames([]);
     setIsCreating(false);
-  }, [newName, newColor, onAddFaction]);
+  }, [newName, newType, newColor, onAddFaction]);
   
   const handleUpdateFaction = useCallback((updates: Partial<Faction>) => {
     if (!selectedFaction) return;
@@ -199,7 +202,8 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
   
   const handleDeleteFaction = useCallback(() => {
     if (!selectedFaction) return;
-    if (confirm(`Delete faction "${selectedFaction.name}"? This cannot be undone.`)) {
+    const typeLabel = selectedFaction.type === 'region' ? 'region' : 'faction';
+    if (confirm(`Delete ${typeLabel} "${selectedFaction.name}"? This cannot be undone.`)) {
       onDeleteFaction(selectedFaction.id);
       setSelectedFactionId(null);
     }
@@ -252,9 +256,33 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
       {isCreating ? (
         <div className="panel">
           <div className="panel-header">
-            <span className="panel-title">New Faction</span>
+            <span className="panel-title">New {newType === 'faction' ? 'Faction' : 'Region'}</span>
           </div>
           <div className="panel-content">
+            {/* Type */}
+            <div className="form-group">
+              <label className="form-label">Type</label>
+              <div className="flex gap-2">
+                <button
+                  className={`btn flex-1 ${newType === 'faction' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setNewType('faction')}
+                >
+                  Faction
+                </button>
+                <button
+                  className={`btn flex-1 ${newType === 'region' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setNewType('region')}
+                >
+                  Region
+                </button>
+              </div>
+              <p className="text-xs text-muted mt-1">
+                {newType === 'faction'
+                  ? 'Factions are political groups with relationships'
+                  : 'Regions are geographic areas for organization'}
+              </p>
+            </div>
+
             {/* Name */}
             <div className="form-group">
               <label className="form-label">Name</label>
@@ -263,10 +291,10 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
                 className="form-input"
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
-                placeholder="Enter faction name..."
+                placeholder={newType === 'faction' ? "Enter faction name..." : "Enter region name..."}
               />
             </div>
-            
+
             {/* Name Generator */}
             <div className="form-group">
               <button
@@ -318,7 +346,7 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
                 onClick={handleCreateFaction}
                 disabled={!newName.trim()}
               >
-                Create Faction
+                Create {newType === 'faction' ? 'Faction' : 'Region'}
               </button>
               <button
                 className="btn btn-secondary"
@@ -326,6 +354,7 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
                   setIsCreating(false);
                   setGeneratedNames([]);
                   setNewName('');
+                  setNewType('faction');
                 }}
               >
                 Cancel
@@ -359,6 +388,25 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
             <div className="panel-content" style={{ padding: 0 }}>
               {/* General */}
               <Accordion title="General" defaultOpen={true}>
+                {/* Type */}
+                <div className="form-group">
+                  <label className="form-label">Type</label>
+                  <div className="flex gap-2">
+                    <button
+                      className={`btn btn-sm flex-1 ${selectedFaction.type !== 'region' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => handleUpdateFaction({ type: 'faction' })}
+                    >
+                      Faction
+                    </button>
+                    <button
+                      className={`btn btn-sm flex-1 ${selectedFaction.type === 'region' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => handleUpdateFaction({ type: 'region' })}
+                    >
+                      Region
+                    </button>
+                  </div>
+                </div>
+
                 {/* Name Edit */}
                 <div className="form-group">
                   <label className="form-label">Name</label>
@@ -369,7 +417,7 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
                     onChange={e => handleUpdateFaction({ name: e.target.value })}
                   />
                 </div>
-                
+
                 {/* Color */}
                 <div className="form-group">
                   <label className="form-label">Color</label>
@@ -428,51 +476,53 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
                 )}
               </Accordion>
               
-              {/* Relationships */}
-              <Accordion title="Relationships" defaultOpen={false}>
-                {factions.filter(f => f.id !== selectedFaction.id).length === 0 ? (
-                  <p className="text-sm text-muted">No other factions to have relationships with.</p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {factions
-                      .filter(f => f.id !== selectedFaction.id)
-                      .map(otherFaction => {
-                        const relationship = selectedFaction.relationships.find(
-                          r => r.factionId === otherFaction.id
-                        );
-                        const status = relationship?.status || 'indifference';
-                        
-                        return (
-                          <div key={otherFaction.id} className="relationship-row">
-                            <div className="flex items-center gap-2">
-                              <span 
-                                className="color-dot"
-                                style={{ backgroundColor: otherFaction.color }}
-                              />
-                              <span className="text-sm">{otherFaction.name}</span>
+              {/* Relationships - only for factions, not regions */}
+              {selectedFaction.type !== 'region' && (
+                <Accordion title="Relationships" defaultOpen={false}>
+                  {factions.filter(f => f.id !== selectedFaction.id && f.type !== 'region').length === 0 ? (
+                    <p className="text-sm text-muted">No other factions to have relationships with.</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {factions
+                        .filter(f => f.id !== selectedFaction.id && f.type !== 'region')
+                        .map(otherFaction => {
+                          const relationship = selectedFaction.relationships.find(
+                            r => r.factionId === otherFaction.id
+                          );
+                          const status = relationship?.status || 'indifference';
+
+                          return (
+                            <div key={otherFaction.id} className="relationship-row">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="color-dot"
+                                  style={{ backgroundColor: otherFaction.color }}
+                                />
+                                <span className="text-sm">{otherFaction.name}</span>
+                              </div>
+                              <select
+                                className="form-select relationship-select"
+                                value={status}
+                                onChange={e => handleRelationshipChange(
+                                  otherFaction.id,
+                                  e.target.value as FactionRelationshipStatus
+                                )}
+                                style={{
+                                  color: RELATIONSHIP_LABELS[status].color,
+                                  borderColor: RELATIONSHIP_LABELS[status].color,
+                                }}
+                              >
+                                {Object.entries(RELATIONSHIP_LABELS).map(([key, { label }]) => (
+                                  <option key={key} value={key}>{label}</option>
+                                ))}
+                              </select>
                             </div>
-                            <select
-                              className="form-select relationship-select"
-                              value={status}
-                              onChange={e => handleRelationshipChange(
-                                otherFaction.id, 
-                                e.target.value as FactionRelationshipStatus
-                              )}
-                              style={{ 
-                                color: RELATIONSHIP_LABELS[status].color,
-                                borderColor: RELATIONSHIP_LABELS[status].color,
-                              }}
-                            >
-                              {Object.entries(RELATIONSHIP_LABELS).map(([key, { label }]) => (
-                                <option key={key} value={key}>{label}</option>
-                              ))}
-                            </select>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </Accordion>
+                          );
+                        })}
+                    </div>
+                  )}
+                </Accordion>
+              )}
               
               {/* Notes */}
               <Accordion title="Notes" defaultOpen={true}>
@@ -564,7 +614,7 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
                 onClick={handleDeleteFaction}
                 style={{ width: '100%' }}
               >
-                Delete Faction
+                Delete {selectedFaction.type === 'region' ? 'Region' : 'Faction'}
               </button>
             </div>
           </div>
@@ -579,45 +629,79 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
                 onClick={() => setIsCreating(true)}
                 style={{ width: '100%' }}
               >
-                + New Faction
+                + New Faction / Region
               </button>
             </div>
           </div>
-          
+
           {factions.length === 0 ? (
             <div className="panel">
               <div className="panel-content">
                 <p className="text-sm text-muted text-center">
-                  No factions yet. Create one to get started.
+                  No factions or regions yet. Create one to get started.
                 </p>
               </div>
             </div>
           ) : (
-            <div className="panel">
-              <div className="panel-header">
-                <span className="panel-title">All Factions ({factions.length})</span>
-              </div>
-              <div className="panel-content">
-                <div className="flex flex-col gap-1">
-                  {factions.map(faction => (
-                    <button
-                      key={faction.id}
-                      className="faction-list-item"
-                      onClick={() => setSelectedFactionId(faction.id)}
-                    >
-                      <span 
-                        className="color-dot"
-                        style={{ backgroundColor: faction.color }}
-                      />
-                      <span className="faction-name">{faction.name}</span>
-                      <span className="faction-territory">
-                        {faction.domainHexes.length} hex{faction.domainHexes.length !== 1 ? 'es' : ''}
-                      </span>
-                    </button>
-                  ))}
+            <>
+              {/* Factions Section */}
+              {factions.filter(f => f.type !== 'region').length > 0 && (
+                <div className="panel">
+                  <div className="panel-header">
+                    <span className="panel-title">Factions ({factions.filter(f => f.type !== 'region').length})</span>
+                  </div>
+                  <div className="panel-content">
+                    <div className="flex flex-col gap-1">
+                      {factions.filter(f => f.type !== 'region').map(faction => (
+                        <button
+                          key={faction.id}
+                          className="faction-list-item"
+                          onClick={() => setSelectedFactionId(faction.id)}
+                        >
+                          <span
+                            className="color-dot"
+                            style={{ backgroundColor: faction.color }}
+                          />
+                          <span className="faction-name">{faction.name}</span>
+                          <span className="faction-territory">
+                            {faction.domainHexes.length} hex{faction.domainHexes.length !== 1 ? 'es' : ''}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )}
+
+              {/* Regions Section */}
+              {factions.filter(f => f.type === 'region').length > 0 && (
+                <div className="panel">
+                  <div className="panel-header">
+                    <span className="panel-title">Regions ({factions.filter(f => f.type === 'region').length})</span>
+                  </div>
+                  <div className="panel-content">
+                    <div className="flex flex-col gap-1">
+                      {factions.filter(f => f.type === 'region').map(region => (
+                        <button
+                          key={region.id}
+                          className="faction-list-item"
+                          onClick={() => setSelectedFactionId(region.id)}
+                        >
+                          <span
+                            className="color-dot"
+                            style={{ backgroundColor: region.color }}
+                          />
+                          <span className="faction-name">{region.name}</span>
+                          <span className="faction-territory">
+                            {region.domainHexes.length} hex{region.domainHexes.length !== 1 ? 'es' : ''}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

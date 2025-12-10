@@ -84,7 +84,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
     explored: map.hexes.filter(h => h.campaignData?.explored).length,
     withFeatures: map.hexes.filter(h => h.featureType).length,
     withTags: map.hexes.filter(h => h.campaignData?.tags?.length).length,
-    factions: map.factions?.length ?? 0,
+    factions: map.factions?.filter(f => f.type !== 'region').length ?? 0,
+    regions: map.factions?.filter(f => f.type === 'region').length ?? 0,
   } : null;
   
   return (
@@ -192,7 +193,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
               onClick={() => onStatsClick('all')}
               title="Total hexes - click to view all"
             >
-              🗺 {stats.hexes}
+              ⬢ {stats.hexes}
             </button>
             <button 
               className="toolbar-stat-btn"
@@ -232,6 +233,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
               title="Factions - click to manage"
             >
               👥 {stats.factions}
+            </button>
+            <button
+              className="toolbar-stat-btn"
+              onClick={() => onStatsClick('factions')}
+              title="Regions - click to manage"
+            >
+              🗺 {stats.regions}
             </button>
           </div>
         )}
