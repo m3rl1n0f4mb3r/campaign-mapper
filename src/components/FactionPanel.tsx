@@ -333,6 +333,26 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
                   />
                 ))}
               </div>
+              <div className="color-picker-row">
+                <input
+                  type="color"
+                  className="color-picker-input"
+                  value={newColor}
+                  onChange={e => setNewColor(e.target.value)}
+                />
+                <input
+                  type="text"
+                  className="form-input color-hex-input"
+                  value={newColor}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) {
+                      setNewColor(val);
+                    }
+                  }}
+                  placeholder="#000000"
+                />
+              </div>
             </div>
             
             <p className="text-sm text-muted">
@@ -430,6 +450,26 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
                         onClick={() => handleUpdateFaction({ color })}
                       />
                     ))}
+                  </div>
+                  <div className="color-picker-row">
+                    <input
+                      type="color"
+                      className="color-picker-input"
+                      value={selectedFaction.color || '#808080'}
+                      onChange={e => handleUpdateFaction({ color: e.target.value })}
+                    />
+                    <input
+                      type="text"
+                      className="form-input color-hex-input"
+                      value={selectedFaction.color || ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) {
+                          handleUpdateFaction({ color: val });
+                        }
+                      }}
+                      placeholder="#000000"
+                    />
                   </div>
                 </div>
               </Accordion>
