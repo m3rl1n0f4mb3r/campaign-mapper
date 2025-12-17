@@ -486,6 +486,8 @@ function App() {
   
   // Bulk hex update handler (for regional generation)
   const handleBulkHexUpdate = useCallback((updates: Array<{ coord: HexCoord; changes: Partial<Hex> }>) => {
+    console.log('[App] handleBulkHexUpdate called with', updates.length, 'updates');
+    
     if (!currentMap || updates.length === 0) return;
     
     // Create a map of coord key -> changes for quick lookup
@@ -508,6 +510,8 @@ function App() {
       return hex;
     });
     
+    console.log('[App] handleBulkHexUpdate: updating', newHexes.filter((h, i) => h !== currentMap.hexes[i]).length, 'hexes');
+    
     setCurrentMap({
       ...currentMap,
       hexes: newHexes,
@@ -521,6 +525,44 @@ function App() {
     setCurrentMap({
       ...currentMap,
       factions: [...currentMap.factions, faction],
+      updatedAt: new Date().toISOString(),
+    });
+  }, [currentMap]);
+  
+  // Bulk update hexes and add factions in a single state update to avoid race conditions
+  const handleBulkHexUpdateWithFactions = useCallback((
+    hexUpdates: Array<{ coord: HexCoord; changes: Partial<Hex> }>,
+    newFactions: Faction[]
+  ) => {
+    if (!currentMap) return;
+    
+    console.log('[App] handleBulkHexUpdateWithFactions: updating', hexUpdates.length, 'hexes and adding', newFactions.length, 'factions');
+    
+    // Apply hex updates
+    const updateMap = new Map<string, Partial<Hex>>();
+    for (const update of hexUpdates) {
+      updateMap.set(coordToKey(update.coord), update.changes);
+    }
+    
+    const newHexes = currentMap.hexes.map(hex => {
+      const changes = updateMap.get(coordToKey(hex.coord));
+      if (changes) {
+        return {
+          ...hex,
+          ...changes,
+          campaignData: changes.campaignData 
+            ? { ...hex.campaignData, ...changes.campaignData }
+            : hex.campaignData,
+        };
+      }
+      return hex;
+    });
+    
+    // Update map with both new hexes and new factions
+    setCurrentMap({
+      ...currentMap,
+      hexes: newHexes,
+      factions: [...currentMap.factions, ...newFactions],
       updatedAt: new Date().toISOString(),
     });
   }, [currentMap]);
@@ -633,6 +675,7 @@ function App() {
                 onNeighborClick={handleNeighborClick}
                 onHexUpdate={handleFullHexUpdate}
                 onBulkHexUpdate={handleBulkHexUpdate}
+                onBulkHexUpdateWithFactions={handleBulkHexUpdateWithFactions}
                 onAddFaction={handleAddFaction}
                 onUpdateFaction={handleUpdateFaction}
                 onClose={handleCloseSidebar}

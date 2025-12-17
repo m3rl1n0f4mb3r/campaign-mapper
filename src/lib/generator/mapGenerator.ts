@@ -230,8 +230,11 @@ export function generateRegion(
   // Get 19-hex spiral coords
   const coords = generate19HexRegion(centerCoord);
   
-  // Filter out coords that already have terrain (unless we want to overwrite)
-  const targetCoords = coords.filter(c => !existingTerrain.has(coordToKey(c)));
+  // Filter out coords that already have terrain (keep 'unknown' terrain for generation)
+  const targetCoords = coords.filter(c => {
+    const terrainId = existingTerrain.get(coordToKey(c));
+    return !terrainId || terrainId === 'unknown';
+  });
   
   // Generate each hex in spiral order
   for (let i = 0; i < targetCoords.length; i++) {
