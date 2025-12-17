@@ -50,6 +50,7 @@ interface HexDetailPanelProps {
   onNeighborClick: (coord: HexCoord) => void;
   onHexUpdate: (coord: HexCoord, changes: Partial<Hex>) => void;
   onBulkHexUpdate: (updates: Array<{ coord: HexCoord; changes: Partial<Hex> }>) => void;
+  onBulkHexUpdateWithFactions: (hexUpdates: Array<{ coord: HexCoord; changes: Partial<Hex> }>, newFactions: Faction[]) => void;
   onAddFaction: (faction: Faction) => void;
   onUpdateFaction: (faction: Faction) => void;
   onClose: () => void;
@@ -106,6 +107,7 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   onNeighborClick,
   onHexUpdate,
   onBulkHexUpdate,
+  onBulkHexUpdateWithFactions,
   onAddFaction,
   onUpdateFaction,
   onClose,
@@ -141,6 +143,8 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   const [regionIncludeDungeons, setRegionIncludeDungeons] = useState(true);
   const [regionFeatureChance, setRegionFeatureChance] = useState(15);
   const [regionGenerateFactions, setRegionGenerateFactions] = useState(false);
+  const [regionOverwriteTerrain, setRegionOverwriteTerrain] = useState(false);
+  const [regionOverwriteFeatures, setRegionOverwriteFeatures] = useState(false);
   
   const campaignData = hex.campaignData || {};
   const effectiveTerrain = getEffectiveTerrain(hex);
@@ -517,10 +521,10 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
     const validRegionCoords = regionCoords.filter(c => hexMap.has(coordToKey(c)));
     
     if (mode === 'features') {
-      // Features-only mode: only target hexes without existing features
+      // Features-only mode: target hexes without existing features (or all if overwrite enabled)
       const targetCoords = validRegionCoords.filter(c => {
         const h = hexMap.get(coordToKey(c));
-        return h && !h.featureType;
+        return h && (regionOverwriteFeatures || !h.featureType);
       });
       
       // Build terrain map for lair monster generation
@@ -572,39 +576,78 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
         });
       
       if (updates.length > 0) {
-        onBulkHexUpdate(updates);
+        console.log('[Features-Only] Total updates:', updates.length);
         
         // Generate factions for eligible settlements if enabled
+        const newFactions: Faction[] = [];
         if (regionGenerateFactions) {
+          console.log('[Features-Only] Faction generation enabled, checking', updates.length, 'updates');
+          
           for (const update of updates) {
+            const { col, row } = axialToOffset(update.coord, gridConfig);
+            const displayCoord = `${String(col).padStart(2, '0')}${String(row).padStart(2, '0')}`;
+            
+            // Get current hex state BEFORE update
+            const currentHex = hexMap.get(coordToKey(update.coord));
+            
+            console.log('[Features-Only] Checking update for hex', displayCoord, ':', {
+              currentFeatureType: currentHex?.featureType,
+              newFeatureType: update.changes.featureType,
+              hasFeatureObject: !!update.changes.feature,
+              featureDetails: update.changes.feature?.details,
+            });
+            
             if (update.changes.featureType === 'settlement' && update.changes.feature) {
               const details = update.changes.feature.details as { type?: SettlementType; name?: string };
               const settlementType = details.type || 'village';
+              
+              console.log('[Features-Only] Settlement found at hex', displayCoord, ':', {
+                settlementType,
+                name: details.name,
+                eligible: ['city', 'castle', 'tower', 'abbey'].includes(settlementType),
+              });
               
               // Only cities, castles, towers, and abbeys form factions
               if (['city', 'castle', 'tower', 'abbey'].includes(settlementType)) {
                 const name = details.name || update.changes.campaignData?.name || 'Unnamed';
                 const faction = createFactionFromSettlement(name, settlementType, update.coord);
                 if (faction) {
-                  generateFactionRelationships(faction, map.factions);
-                  onAddFaction(faction);
+                  console.log('[Features-Only] ✓ Creating faction:', faction.name, 'at hex', displayCoord, 'with', faction.domainHexes.length, 'hexes');
+                  newFactions.push(faction);
+                } else {
+                  console.log('[Features-Only] ✗ createFactionFromSettlement returned null for', settlementType);
                 }
               }
             }
           }
+          
+          // Generate relationships between new factions and existing ones
+          for (const faction of newFactions) {
+            generateFactionRelationships(faction, [...map.factions, ...newFactions.filter(f => f.id !== faction.id)]);
+          }
+        }
+        
+        // Apply hex updates and add factions in a single state update to avoid race conditions
+        if (newFactions.length > 0) {
+          onBulkHexUpdateWithFactions(updates, newFactions);
+        } else {
+          onBulkHexUpdate(updates);
         }
       }
     } else {
       // Terrain or terrain+features mode
       const existingTerrain = new Map<string, string>();
       for (const h of map.hexes) {
-        existingTerrain.set(coordToKey(h.coord), h.terrainId);
+        // Only include in existing terrain map if not overwriting or if terrain is not 'unknown'
+        if (!regionOverwriteTerrain && h.terrainId !== 'unknown') {
+          existingTerrain.set(coordToKey(h.coord), h.terrainId);
+        }
       }
       
-      // Build set of hexes with existing features (to skip feature generation)
+      // Build set of hexes with existing features (to skip feature generation unless overwriting)
       const existingFeatures = new Set(
         map.hexes
-          .filter(h => h.featureType)
+          .filter(h => h.featureType && !regionOverwriteFeatures)
           .map(h => coordToKey(h.coord))
       );
       
@@ -618,13 +661,13 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
         includeDungeons: regionIncludeDungeons,
       });
       
-      // Convert results to updates, skipping feature generation for hexes with existing features
+      // Convert results to updates
       const updates: Array<{ coord: HexCoord; changes: Partial<Hex> }> = results.map(result => {
         const changes: Partial<Hex> = {
           terrainId: result.terrainId,
         };
         
-        // Only add feature if hex doesn't already have one
+        // Add feature if generated and (no existing feature OR overwrite enabled)
         const hasExistingFeature = existingFeatures.has(coordToKey(result.coord));
         if (result.featureType && result.feature && !hasExistingFeature) {
           changes.featureType = result.featureType;
@@ -656,30 +699,64 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
       });
       
       if (updates.length > 0) {
-        onBulkHexUpdate(updates);
+        console.log('[Terrain/Terrain+Features] Total updates:', updates.length);
         
         // Generate factions for eligible settlements if enabled
+        const newFactions: Faction[] = [];
         if (regionGenerateFactions) {
+          console.log('[Terrain/Terrain+Features] Faction generation enabled, checking', updates.length, 'updates');
+          
           for (const update of updates) {
+            const { col, row } = axialToOffset(update.coord, gridConfig);
+            const displayCoord = `${String(col).padStart(2, '0')}${String(row).padStart(2, '0')}`;
+            
+            console.log('[Terrain/Terrain+Features] Checking update:', {
+              hex: displayCoord,
+              featureType: update.changes.featureType,
+              hasFeature: !!update.changes.feature,
+              terrainId: update.changes.terrainId,
+            });
+            
             if (update.changes.featureType === 'settlement' && update.changes.feature) {
               const details = update.changes.feature.details as { type?: SettlementType; name?: string };
               const settlementType = details.type || 'village';
+              
+              console.log('[Terrain/Terrain+Features] Settlement found:', {
+                hex: displayCoord,
+                settlementType,
+                name: details.name,
+                eligible: ['city', 'castle', 'tower', 'abbey'].includes(settlementType),
+              });
               
               // Only cities, castles, towers, and abbeys form factions
               if (['city', 'castle', 'tower', 'abbey'].includes(settlementType)) {
                 const name = details.name || update.changes.campaignData?.name || 'Unnamed';
                 const faction = createFactionFromSettlement(name, settlementType, update.coord);
                 if (faction) {
-                  generateFactionRelationships(faction, map.factions);
-                  onAddFaction(faction);
+                  console.log('[Terrain/Terrain+Features] ✓ Creating faction:', faction.name, 'at hex', displayCoord, 'with', faction.domainHexes.length, 'hexes');
+                  newFactions.push(faction);
+                } else {
+                  console.log('[Terrain/Terrain+Features] ✗ createFactionFromSettlement returned null for', settlementType);
                 }
               }
             }
           }
+          
+          // Generate relationships between new factions and existing ones
+          for (const faction of newFactions) {
+            generateFactionRelationships(faction, [...map.factions, ...newFactions.filter(f => f.id !== faction.id)]);
+          }
+        }
+        
+        // Apply hex updates and add factions in a single state update to avoid race conditions
+        if (newFactions.length > 0) {
+          onBulkHexUpdateWithFactions(updates, newFactions);
+        } else {
+          onBulkHexUpdate(updates);
         }
       }
     }
-  }, [hex.coord, map.hexes, map.factions, regionFeatureChance, regionIncludeLandmarks, regionIncludeSettlements, regionIncludeLairs, regionIncludeDungeons, regionGenerateFactions, onBulkHexUpdate, onAddFaction]);
+  }, [hex.coord, map.hexes, map.factions, regionFeatureChance, regionIncludeLandmarks, regionIncludeSettlements, regionIncludeLairs, regionIncludeDungeons, regionGenerateFactions, regionOverwriteTerrain, regionOverwriteFeatures, onBulkHexUpdate, onBulkHexUpdateWithFactions, onAddFaction, gridConfig]);
   
   // Count hexes in region for different generation modes
   const regionCounts = React.useMemo(() => {
@@ -1563,7 +1640,6 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
             <Accordion title="Regional Generation (19 Hex)" defaultOpen={false}>
               <p className="text-sm text-muted mb-2">
                 Generate for a 19-hex region (center + 2 rings) around this hex.
-                Existing features are preserved.
               </p>
               
               {/* Stats */}
@@ -1579,6 +1655,29 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                     {regionCounts.needsFeature} without features
                   </div>
                 )}
+              </div>
+              
+              {/* Overwrite Options */}
+              <div className="form-group">
+                <label className="form-label">Overwrite Options</label>
+                <div className="flex flex-col gap-1">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={regionOverwriteTerrain}
+                      onChange={e => setRegionOverwriteTerrain(e.target.checked)}
+                    />
+                    Overwrite existing terrain
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={regionOverwriteFeatures}
+                      onChange={e => setRegionOverwriteFeatures(e.target.checked)}
+                    />
+                    Overwrite existing features
+                  </label>
+                </div>
               </div>
               
               {/* Feature Options */}
@@ -1656,14 +1755,12 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                 <button
                   className="btn btn-secondary"
                   onClick={() => handleGenerateRegion('terrain')}
-                  disabled={regionCounts.needsTerrain === 0}
                 >
                   Terrain Only
                 </button>
                 <button
                   className="btn btn-secondary"
                   onClick={() => handleGenerateRegion('features')}
-                  disabled={regionCounts.needsFeature === 0}
                 >
                   Features Only
                 </button>
