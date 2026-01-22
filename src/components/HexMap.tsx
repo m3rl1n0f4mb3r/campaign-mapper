@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState, useRef } from 'react';
+import React, { useMemo, useCallback, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import type { Hex, HexCoord, GridConfig, TerrainType, Faction, ImageOverlay, CampaignSettings } from '@/lib/types';
 import { coordToKey, hexHasUserData, getEffectiveTerrain, DEFAULT_TERRAIN_TYPES } from '@/lib/types';
 import { 
@@ -25,6 +25,12 @@ interface HexMapProps {
   onHexHover?: (coord: HexCoord | null) => void;
   onBoxSelect?: (coords: HexCoord[]) => void;
   onZoomChange?: (zoom: number) => void;
+}
+
+// Handle for accessing HexMap internals (used for image export)
+export interface HexMapHandle {
+  getSvgElement: () => SVGSVGElement | null;
+  getBackgroundImage: () => string | undefined;
 }
 
 // Generate a consistent color for a faction
@@ -252,7 +258,7 @@ const SelectionBox: React.FC<SelectionBoxProps> = ({ startX, startY, currentX, c
   );
 };
 
-const HexMap: React.FC<HexMapProps> = ({
+const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
   hexes,
   gridConfig,
   settings,
@@ -266,7 +272,7 @@ const HexMap: React.FC<HexMapProps> = ({
   onHexHover,
   onBoxSelect,
   onZoomChange,
-}) => {
+}, ref) => {
   // Box selection state
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
@@ -274,6 +280,12 @@ const HexMap: React.FC<HexMapProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const didDragRef = useRef(false); // Track if we just completed a drag
+
+  // Expose methods for image export
+  useImperativeHandle(ref, () => ({
+    getSvgElement: () => svgRef.current,
+    getBackgroundImage: () => imageOverlay?.src,
+  }));
   
   // Native wheel event listener for zoom (needs passive: false to preventDefault)
   React.useEffect(() => {
@@ -560,6 +572,8 @@ const HexMap: React.FC<HexMapProps> = ({
       </svg>
     </div>
   );
-};
+});
+
+HexMap.displayName = 'HexMap';
 
 export default HexMap;

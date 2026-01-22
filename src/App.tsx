@@ -33,7 +33,8 @@ import {
   loadAppSettings,
 } from '@/lib/storage';
 
-import HexMap from '@/components/HexMap';
+import HexMap, { type HexMapHandle } from '@/components/HexMap';
+import { exportMapAsImage } from '@/lib/imageExport';
 import HexDetailPanel from '@/components/HexDetailPanel';
 import MultiSelectPanel from '@/components/MultiSelectPanel';
 import SettingsPanel from '@/components/SettingsPanel';
@@ -57,6 +58,9 @@ function App() {
 
   // Ref for map container (for scrolling to hexes)
   const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // Ref for HexMap (for image export)
+  const hexMapRef = useRef<HexMapHandle>(null);
 
   // Load last map on mount
   useEffect(() => {
@@ -373,6 +377,25 @@ function App() {
       }
     }
   }, [currentMap]);
+
+  const handleExportMapAsImage = useCallback(async () => {
+    if (!currentMap || !hexMapRef.current) return;
+
+    const svg = hexMapRef.current.getSvgElement();
+    if (!svg) {
+      alert('Unable to export: map not ready');
+      return;
+    }
+
+    try {
+      await exportMapAsImage(svg, {
+        backgroundImage: hexMapRef.current.getBackgroundImage(),
+        filename: currentMap.name,
+      });
+    } catch (err) {
+      alert('Failed to export image: ' + (err as Error).message);
+    }
+  }, [currentMap]);
   
   const handleImportMap = useCallback(() => {
     const input = document.createElement('input');
@@ -598,6 +621,7 @@ function App() {
           onNewMap={handleNewMap}
           onOpenMap={handleOpenMap}
           onExportMap={handleExportMap}
+          onExportMapAsImage={handleExportMapAsImage}
           onImportMap={handleImportMap}
           onOpenSettings={handleOpenSettings}
           onMapNameChange={handleMapNameChange}
@@ -612,6 +636,7 @@ function App() {
           {currentMap ? (
             <>
               <HexMap
+                ref={hexMapRef}
                 hexes={currentMap.hexes}
                 gridConfig={currentMap.gridConfig}
                 settings={currentMap.settings}
