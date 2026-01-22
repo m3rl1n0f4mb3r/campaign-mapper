@@ -157,6 +157,9 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
     <g
       className={classNames}
       transform={`translate(${x}, ${y})`}
+      data-coord={displayCoord}
+      data-coord-x={coordOffset.x}
+      data-coord-y={coordOffset.y}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -167,6 +170,8 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
         points={getHexPoints(0, 0, gridConfig)}
         fill={fillColor}
         fillOpacity={opacity}
+        data-terrain-color={terrain.color}
+        data-terrain-symbol={terrain.symbol || ''}
         style={factionColor && !isSelected && !isMultiSelected ? {
           stroke: factionColor,
           strokeWidth: 3,

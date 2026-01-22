@@ -3,52 +3,166 @@
  * Exports the hex map as a PNG image for use in VTT applications
  */
 
-interface ExportOptions {
-  backgroundImage?: string;  // data URL of background image
+export type ImageFormat = 'png' | 'jpeg' | 'webp';
+
+export interface ImageExportOptions {
   filename?: string;
+  format?: ImageFormat;
+  quality?: number;
+  backgroundImage?: string;
+  includeBackground?: boolean;
+  backgroundOpacity?: number;
+  includeHexOutlines?: boolean;
+  hexOutlineOpacity?: number;
+  hexFillOpacity?: number;
+  includeCoordinates?: boolean;
+  includeFeatureMarkers?: boolean;
+  includeTerrainSymbols?: boolean;
+  scale?: number;
+}
+
+const DEFAULT_OPTIONS: Required<Omit<ImageExportOptions, 'backgroundImage'>> = {
+  filename: 'map',
+  format: 'png',
+  quality: 85,
+  includeBackground: true,
+  backgroundOpacity: 100,
+  includeHexOutlines: true,
+  hexOutlineOpacity: 30,
+  hexFillOpacity: 50,
+  includeCoordinates: true,
+  includeFeatureMarkers: true,
+  includeTerrainSymbols: true,
+  scale: 1,
+};
+
+/**
+ * Create an SVG text element
+ */
+function createSvgText(
+  content: string,
+  x: number,
+  y: number,
+  className: string,
+  styles: Record<string, string>
+): SVGTextElement {
+  const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  text.setAttribute('class', className);
+  text.setAttribute('x', String(x));
+  text.setAttribute('y', String(y));
+  text.textContent = content;
+  Object.assign(text.style, styles);
+  return text;
 }
 
 /**
  * Inline CSS styles into SVG elements for export
- * (External CSS won't be available when SVG is serialized)
+ * Uses data attributes to ensure terrain colors/symbols are available
+ * even when display settings have them hidden
  */
-function inlineStyles(svg: SVGSVGElement): SVGSVGElement {
+function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGElement {
   const clone = svg.cloneNode(true) as SVGSVGElement;
+  const opts = { ...DEFAULT_OPTIONS, ...options };
 
   // Remove selection highlighting classes (shouldn't appear in export)
   clone.querySelectorAll('.selected, .multi-selected').forEach(el => {
     el.classList.remove('selected', 'multi-selected');
   });
 
-  // Inline styles for hex polygons
-  clone.querySelectorAll('.hex-polygon').forEach(el => {
-    const polygon = el as SVGPolygonElement;
+  // Process each hex group
+  clone.querySelectorAll('.hex').forEach(hexGroup => {
+    const group = hexGroup as SVGGElement;
+    const polygon = group.querySelector('.hex-polygon') as SVGPolygonElement | null;
 
-    // Only set stroke if not already inline-styled (faction borders)
-    if (!polygon.style.stroke) {
-      polygon.style.stroke = 'rgba(255, 255, 255, 0.3)';
-      polygon.style.strokeWidth = '1';
+    if (!polygon) return;
+
+    // Get terrain data from data attributes
+    const terrainColor = polygon.getAttribute('data-terrain-color') || '#808080';
+    const terrainSymbol = polygon.getAttribute('data-terrain-symbol') || '';
+
+    // Apply terrain fill color from data attribute (overrides current fill)
+    // This ensures export works even when "Show Terrain Colors" is off
+    polygon.setAttribute('fill', terrainColor);
+    polygon.setAttribute('fill-opacity', String(opts.hexFillOpacity / 100));
+
+    // Handle hex outlines
+    if (opts.includeHexOutlines) {
+      // Only set stroke if not already inline-styled (faction borders)
+      if (!polygon.style.stroke) {
+        const outlineAlpha = opts.hexOutlineOpacity / 100;
+        polygon.style.stroke = `rgba(255, 255, 255, ${outlineAlpha})`;
+        polygon.style.strokeWidth = '1';
+      }
+    } else {
+      // Remove outlines entirely (unless faction border)
+      if (!polygon.style.stroke || polygon.style.stroke.includes('255, 255, 255')) {
+        polygon.style.stroke = 'none';
+      }
+    }
+
+    // Handle terrain symbols
+    let symbolEl = group.querySelector('.hex-symbol') as SVGTextElement | null;
+    if (opts.includeTerrainSymbols && terrainSymbol) {
+      if (!symbolEl) {
+        // Create symbol element if it doesn't exist
+        symbolEl = createSvgText(terrainSymbol, 0, 0, 'hex-symbol', {
+          fontSize: '16px',
+          textAnchor: 'middle',
+          dominantBaseline: 'central',
+          fill: 'rgba(255, 255, 255, 0.7)',
+          pointerEvents: 'none',
+        });
+        group.appendChild(symbolEl);
+      } else {
+        // Style existing symbol
+        symbolEl.style.fontSize = '16px';
+        symbolEl.style.textAnchor = 'middle';
+        symbolEl.style.dominantBaseline = 'central';
+        symbolEl.style.fill = 'rgba(255, 255, 255, 0.7)';
+        symbolEl.style.pointerEvents = 'none';
+      }
+    } else if (symbolEl) {
+      symbolEl.remove();
+    }
+
+    // Handle coordinate labels
+    const coordValue = group.getAttribute('data-coord');
+    const coordX = parseFloat(group.getAttribute('data-coord-x') || '0');
+    const coordY = parseFloat(group.getAttribute('data-coord-y') || '0');
+    let coordEl = group.querySelector('.hex-coord') as SVGTextElement | null;
+
+    if (opts.includeCoordinates && coordValue) {
+      if (!coordEl) {
+        // Create coordinate element if it doesn't exist
+        coordEl = createSvgText(coordValue, coordX, coordY, 'hex-coord', {
+          fontSize: '10px',
+          textAnchor: 'middle',
+          fill: 'rgba(255, 255, 255, 0.5)',
+          pointerEvents: 'none',
+        });
+        group.appendChild(coordEl);
+      } else {
+        // Style existing coordinate
+        coordEl.style.fontSize = '10px';
+        coordEl.style.textAnchor = 'middle';
+        coordEl.style.fill = 'rgba(255, 255, 255, 0.5)';
+        coordEl.style.pointerEvents = 'none';
+      }
+    } else if (coordEl) {
+      coordEl.remove();
     }
   });
 
-  // Inline styles for terrain symbols
-  clone.querySelectorAll('.hex-symbol').forEach(el => {
-    const text = el as SVGTextElement;
-    text.style.fontSize = '16px';
-    text.style.textAnchor = 'middle';
-    text.style.dominantBaseline = 'central';
-    text.style.fill = 'rgba(255, 255, 255, 0.7)';
-    text.style.pointerEvents = 'none';
-  });
-
-  // Inline styles for coordinate labels
-  clone.querySelectorAll('.hex-coord').forEach(el => {
-    const text = el as SVGTextElement;
-    text.style.fontSize = '10px';
-    text.style.textAnchor = 'middle';
-    text.style.fill = 'rgba(255, 255, 255, 0.5)';
-    text.style.pointerEvents = 'none';
-  });
+  // Handle feature markers
+  if (opts.includeFeatureMarkers) {
+    // Style feature indicator text
+    clone.querySelectorAll('.hex-feature-indicator text').forEach(el => {
+      const text = el as SVGTextElement;
+      text.style.pointerEvents = 'none';
+    });
+  } else {
+    clone.querySelectorAll('.hex-feature-indicator').forEach(el => el.remove());
+  }
 
   // Inline styles for explored dots
   clone.querySelectorAll('.hex-explored-dot').forEach(el => {
@@ -90,35 +204,48 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Export the map as a PNG image
+ * Export the map as an image (PNG, JPEG, or WebP)
  */
 export async function exportMapAsImage(
   svgElement: SVGSVGElement,
-  options: ExportOptions = {}
+  options: ImageExportOptions = {}
 ): Promise<void> {
-  const { backgroundImage, filename = 'map' } = options;
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+  const { backgroundImage } = options;
 
   // Clone and inline styles
-  const styledSvg = inlineStyles(svgElement);
+  const styledSvg = inlineStyles(svgElement, opts);
 
   // Get dimensions from viewBox
   const viewBox = parseViewBox(svgElement.getAttribute('viewBox'));
 
+  // Apply scale to canvas dimensions
+  const scale = opts.scale;
+  const canvasWidth = Math.round(viewBox.width * scale);
+  const canvasHeight = Math.round(viewBox.height * scale);
+
   // Create canvas
   const canvas = document.createElement('canvas');
-  canvas.width = viewBox.width;
-  canvas.height = viewBox.height;
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
 
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     throw new Error('Failed to get canvas context');
   }
 
-  // Draw background image if present
-  if (backgroundImage) {
+  // Scale the context to match resolution
+  ctx.scale(scale, scale);
+
+  // Draw background image if present and enabled
+  if (backgroundImage && opts.includeBackground) {
     try {
       const bgImg = await loadImage(backgroundImage);
+
+      // Apply background opacity
+      ctx.globalAlpha = opts.backgroundOpacity / 100;
       ctx.drawImage(bgImg, 0, 0, viewBox.width, viewBox.height);
+      ctx.globalAlpha = 1;
     } catch (e) {
       console.warn('Failed to draw background image:', e);
       // Continue without background
@@ -134,7 +261,24 @@ export async function exportMapAsImage(
   const svgImg = await loadImage(svgDataUrl);
   ctx.drawImage(svgImg, 0, 0, viewBox.width, viewBox.height);
 
-  // Export as PNG
+  // Determine MIME type and file extension
+  const mimeTypes: Record<ImageFormat, string> = {
+    png: 'image/png',
+    jpeg: 'image/jpeg',
+    webp: 'image/webp',
+  };
+  const extensions: Record<ImageFormat, string> = {
+    png: 'png',
+    jpeg: 'jpg',
+    webp: 'webp',
+  };
+  const mimeType = mimeTypes[opts.format];
+  const extension = extensions[opts.format];
+
+  // Quality only applies to jpeg and webp (0-1 range)
+  const quality = opts.format === 'png' ? undefined : opts.quality / 100;
+
+  // Export image
   canvas.toBlob((blob) => {
     if (!blob) {
       throw new Error('Failed to create image blob');
@@ -143,9 +287,9 @@ export async function exportMapAsImage(
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${filename.replace(/\s+/g, '_')}.png`;
+    a.download = `${opts.filename.replace(/\s+/g, '_')}.${extension}`;
     a.click();
 
     URL.revokeObjectURL(url);
-  }, 'image/png');
+  }, mimeType, quality);
 }

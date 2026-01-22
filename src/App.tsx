@@ -34,7 +34,8 @@ import {
 } from '@/lib/storage';
 
 import HexMap, { type HexMapHandle } from '@/components/HexMap';
-import { exportMapAsImage } from '@/lib/imageExport';
+import { exportMapAsImage, type ImageExportOptions } from '@/lib/imageExport';
+import ExportImageDialog from '@/components/ExportImageDialog';
 import HexDetailPanel from '@/components/HexDetailPanel';
 import MultiSelectPanel from '@/components/MultiSelectPanel';
 import SettingsPanel from '@/components/SettingsPanel';
@@ -53,6 +54,7 @@ function App() {
   const [sidebarView, setSidebarView] = useState<SidebarView>('none');
   const [showNewMapDialog, setShowNewMapDialog] = useState(false);
   const [showMapList, setShowMapList] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [hexListFilter, setHexListFilter] = useState<StatsFilterType | null>(null);
 
@@ -378,7 +380,12 @@ function App() {
     }
   }, [currentMap]);
 
-  const handleExportMapAsImage = useCallback(async () => {
+  const handleExportMapAsImage = useCallback(() => {
+    if (!currentMap) return;
+    setShowExportDialog(true);
+  }, [currentMap]);
+
+  const handleExportWithOptions = useCallback(async (options: ImageExportOptions) => {
     if (!currentMap || !hexMapRef.current) return;
 
     const svg = hexMapRef.current.getSvgElement();
@@ -389,9 +396,10 @@ function App() {
 
     try {
       await exportMapAsImage(svg, {
+        ...options,
         backgroundImage: hexMapRef.current.getBackgroundImage(),
-        filename: currentMap.name,
       });
+      setShowExportDialog(false);
     } catch (err) {
       alert('Failed to export image: ' + (err as Error).message);
     }
@@ -759,7 +767,15 @@ function App() {
         onClose={() => setShowNewMapDialog(false)}
         onCreate={handleCreateMap}
       />
-      
+
+      <ExportImageDialog
+        isOpen={showExportDialog}
+        mapName={currentMap?.name || 'map'}
+        hasBackgroundImage={!!currentMap?.imageOverlay?.src}
+        onClose={() => setShowExportDialog(false)}
+        onExport={handleExportWithOptions}
+      />
+
       {/* Map List Modal */}
       {showMapList && (
         <div className="modal-overlay" onClick={() => setShowMapList(false)}>
