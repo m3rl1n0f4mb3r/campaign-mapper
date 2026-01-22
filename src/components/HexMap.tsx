@@ -88,10 +88,12 @@ interface HexCellProps {
   showTerrainColors: boolean;
   showDataIndicator: boolean;
   showCoordinates: boolean;
+  showGrid: boolean;
   factionColor?: string;
   isExplored: boolean;
   showExploredStatus: boolean;
   fillOpacity: number;
+  gridOpacity: number;
   onClick: (event: React.MouseEvent) => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -107,10 +109,12 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
   showTerrainColors,
   showDataIndicator,
   showCoordinates,
+  showGrid,
   factionColor,
   isExplored,
   showExploredStatus,
   fillOpacity,
+  gridOpacity,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -172,10 +176,15 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
         fillOpacity={opacity}
         data-terrain-color={terrain.color}
         data-terrain-symbol={terrain.symbol || ''}
+        data-grid-opacity={gridOpacity}
         style={factionColor && !isSelected && !isMultiSelected ? {
           stroke: factionColor,
           strokeWidth: 3,
-        } : undefined}
+        } : showGrid ? {
+          strokeOpacity: gridOpacity,
+        } : {
+          stroke: 'none',
+        }}
       />
       
       {/* Terrain symbol */}
@@ -553,10 +562,12 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
                 showTerrainColors={settings?.showTerrainColors ?? true}
                 showDataIndicator={settings?.showDataIndicators ?? true}
                 showCoordinates={settings?.showCoordinates ?? true}
+                showGrid={settings?.showGrid ?? true}
                 factionColor={factionColor}
                 isExplored={isExplored}
                 showExploredStatus={settings?.showExploredStatus ?? false}
                 fillOpacity={settings?.hexFillOpacity ?? 0.5}
+                gridOpacity={settings?.gridOpacity ?? 0.3}
                 onClick={(e) => handleHexClick(hex, e)}
                 onMouseEnter={() => handleMouseEnter(hex)}
                 onMouseLeave={handleMouseLeave}

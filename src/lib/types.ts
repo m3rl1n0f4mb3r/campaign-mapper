@@ -281,10 +281,11 @@ export interface CampaignSettings {
   showGrid: boolean;
   showCoordinates: boolean;
   hexFillOpacity: number;
-  
+  gridOpacity: number;
+
   // Available tags for quick selection
   availableTags: string[];
-  
+
   // Custom terrain types (in addition to defaults)
   customTerrainTypes: TerrainType[];
 }
@@ -297,6 +298,7 @@ export const DEFAULT_CAMPAIGN_SETTINGS: CampaignSettings = {
   showGrid: true,
   showCoordinates: true,
   hexFillOpacity: 0.5,
+  gridOpacity: 0.3,
   availableTags: [], // User-defined tags only
   customTerrainTypes: [],
 };

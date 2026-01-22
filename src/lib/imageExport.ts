@@ -12,12 +12,14 @@ export interface ImageExportOptions {
   backgroundImage?: string;
   includeBackground?: boolean;
   backgroundOpacity?: number;
-  includeHexOutlines?: boolean;
-  hexOutlineOpacity?: number;
+  showGrid?: boolean;
+  gridOpacity?: number;
   hexFillOpacity?: number;
-  includeCoordinates?: boolean;
-  includeFeatureMarkers?: boolean;
-  includeTerrainSymbols?: boolean;
+  showTerrainColors?: boolean;
+  showCoordinates?: boolean;
+  showFeatureMarkers?: boolean;
+  showFactionTerritories?: boolean;
+  showFogOfWar?: boolean;
   scale?: number;
 }
 
@@ -27,12 +29,14 @@ const DEFAULT_OPTIONS: Required<Omit<ImageExportOptions, 'backgroundImage'>> = {
   quality: 85,
   includeBackground: true,
   backgroundOpacity: 100,
-  includeHexOutlines: true,
-  hexOutlineOpacity: 30,
+  showGrid: true,
+  gridOpacity: 30,
   hexFillOpacity: 50,
-  includeCoordinates: true,
-  includeFeatureMarkers: true,
-  includeTerrainSymbols: true,
+  showTerrainColors: true,
+  showCoordinates: true,
+  showFeatureMarkers: true,
+  showFactionTerritories: true,
+  showFogOfWar: false,
   scale: 1,
 };
 
@@ -82,15 +86,19 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
 
     // Apply terrain fill color from data attribute (overrides current fill)
     // This ensures export works even when "Show Terrain Colors" is off
-    polygon.setAttribute('fill', terrainColor);
-    polygon.setAttribute('fill-opacity', String(opts.hexFillOpacity / 100));
+    if (opts.showTerrainColors) {
+      polygon.setAttribute('fill', terrainColor);
+      polygon.setAttribute('fill-opacity', String(opts.hexFillOpacity / 100));
+    } else {
+      polygon.setAttribute('fill', 'transparent');
+    }
 
-    // Handle hex outlines
-    if (opts.includeHexOutlines) {
+    // Handle hex grid outlines
+    if (opts.showGrid) {
       // Only set stroke if not already inline-styled (faction borders)
       if (!polygon.style.stroke) {
-        const outlineAlpha = opts.hexOutlineOpacity / 100;
-        polygon.style.stroke = `rgba(255, 255, 255, ${outlineAlpha})`;
+        const gridAlpha = opts.gridOpacity / 100;
+        polygon.style.stroke = `rgba(255, 255, 255, ${gridAlpha})`;
         polygon.style.strokeWidth = '1';
       }
     } else {
@@ -100,9 +108,9 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
       }
     }
 
-    // Handle terrain symbols
+    // Handle terrain symbols (tied to terrain colors setting)
     let symbolEl = group.querySelector('.hex-symbol') as SVGTextElement | null;
-    if (opts.includeTerrainSymbols && terrainSymbol) {
+    if (opts.showTerrainColors && terrainSymbol) {
       if (!symbolEl) {
         // Create symbol element if it doesn't exist
         symbolEl = createSvgText(terrainSymbol, 0, 0, 'hex-symbol', {
@@ -131,7 +139,7 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
     const coordY = parseFloat(group.getAttribute('data-coord-y') || '0');
     let coordEl = group.querySelector('.hex-coord') as SVGTextElement | null;
 
-    if (opts.includeCoordinates && coordValue) {
+    if (opts.showCoordinates && coordValue) {
       if (!coordEl) {
         // Create coordinate element if it doesn't exist
         coordEl = createSvgText(coordValue, coordX, coordY, 'hex-coord', {
@@ -154,7 +162,7 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
   });
 
   // Handle feature markers
-  if (opts.includeFeatureMarkers) {
+  if (opts.showFeatureMarkers) {
     // Style feature indicator text
     clone.querySelectorAll('.hex-feature-indicator text').forEach(el => {
       const text = el as SVGTextElement;
@@ -162,6 +170,27 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
     });
   } else {
     clone.querySelectorAll('.hex-feature-indicator').forEach(el => el.remove());
+  }
+
+  // Handle faction territories
+  if (!opts.showFactionTerritories) {
+    // Remove faction border styling
+    clone.querySelectorAll('.hex-polygon').forEach(el => {
+      const polygon = el as SVGPolygonElement;
+      // Check if this has faction border (colored stroke that's not the default white grid)
+      if (polygon.style.stroke && !polygon.style.stroke.includes('255, 255, 255')) {
+        polygon.style.stroke = opts.showGrid ? `rgba(255, 255, 255, ${opts.gridOpacity / 100})` : 'none';
+        polygon.style.strokeWidth = opts.showGrid ? '1' : '0';
+      }
+    });
+  }
+
+  // Handle fog of war (explored status)
+  if (!opts.showFogOfWar) {
+    clone.querySelectorAll('.hex-explored-dot').forEach(el => el.remove());
+    clone.querySelectorAll('.hex-unexplored').forEach(el => {
+      el.classList.remove('hex-unexplored');
+    });
   }
 
   // Inline styles for explored dots

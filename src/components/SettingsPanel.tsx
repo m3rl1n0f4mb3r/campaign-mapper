@@ -1,13 +1,15 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import type { CampaignSettings, GridConfig, TerrainType } from '@/lib/types';
+import type { CampaignSettings, GridConfig, TerrainType, ImageOverlay } from '@/lib/types';
 import { DEFAULT_TERRAIN_TYPES } from '@/lib/types';
 import { getHexSpacing, getHexDimensions } from '@/lib/hexUtils';
 
 interface SettingsPanelProps {
   settings: CampaignSettings;
   gridConfig: GridConfig;
+  imageOverlay?: ImageOverlay;
   onSettingsChange: (updates: Partial<CampaignSettings>) => void;
   onGridConfigChange: (updates: Partial<GridConfig>) => void;
+  onImageOverlayChange?: (updates: Partial<ImageOverlay>) => void;
   onClose: () => void;
 }
 
@@ -337,8 +339,10 @@ const TerrainTypesSection: React.FC<TerrainTypesSectionProps> = ({
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
   settings,
   gridConfig,
+  imageOverlay,
   onSettingsChange,
   onGridConfigChange,
+  onImageOverlayChange,
   onClose,
 }) => {
   // Get current spacing (either custom or calculated)
@@ -507,6 +511,67 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       
       {/* Display Settings Accordion */}
       <Accordion title="Display" defaultOpen={false}>
+        {/* Background (only for overlay maps) */}
+        {imageOverlay && onImageOverlayChange && (
+          <>
+            <div className="panel-row mb-2">
+              <span className="panel-row-label">Show Background</span>
+              <button
+                className={`btn btn-sm ${imageOverlay.visible ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => onImageOverlayChange({ visible: !imageOverlay.visible })}
+              >
+                {imageOverlay.visible ? 'On' : 'Off'}
+              </button>
+            </div>
+
+            {imageOverlay.visible && (
+              <div className="form-group">
+                <label className="form-label">
+                  Background Opacity: {Math.round((imageOverlay.opacity ?? 1) * 100)}%
+                </label>
+                <input
+                  type="range"
+                  className="form-range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={imageOverlay.opacity ?? 1}
+                  onChange={e => onImageOverlayChange({ opacity: parseFloat(e.target.value) })}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Grid */}
+        <div className="panel-row mb-2">
+          <span className="panel-row-label">Show Grid</span>
+          <button
+            className={`btn btn-sm ${settings?.showGrid ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => onSettingsChange({ showGrid: !settings?.showGrid })}
+          >
+            {settings?.showGrid ? 'On' : 'Off'}
+          </button>
+        </div>
+
+        {settings?.showGrid && (
+          <div className="form-group">
+            <label className="form-label">
+              Grid Opacity: {Math.round((settings?.gridOpacity ?? 0.3) * 100)}%
+            </label>
+            <input
+              type="range"
+              className="form-range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={settings?.gridOpacity ?? 0.3}
+              onChange={e => onSettingsChange({ gridOpacity: parseFloat(e.target.value) })}
+            />
+          </div>
+        )}
+
+        {/* Terrain & Labels */}
         <div className="panel-row mb-2">
           <span className="panel-row-label">Show Terrain Colors</span>
           <button
@@ -516,22 +581,24 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             {settings?.showTerrainColors ? 'On' : 'Off'}
           </button>
         </div>
-        
-        <div className="form-group">
-          <label className="form-label">
-            Hex Fill Opacity: {Math.round((settings?.hexFillOpacity ?? 0.5) * 100)}%
-          </label>
-          <input
-            type="range"
-            className="form-range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={settings?.hexFillOpacity ?? 0.5}
-            onChange={e => onSettingsChange({ hexFillOpacity: parseFloat(e.target.value) })}
-          />
-        </div>
-        
+
+        {settings?.showTerrainColors && (
+          <div className="form-group">
+            <label className="form-label">
+              Hex Fill Opacity: {Math.round((settings?.hexFillOpacity ?? 0.5) * 100)}%
+            </label>
+            <input
+              type="range"
+              className="form-range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={settings?.hexFillOpacity ?? 0.5}
+              onChange={e => onSettingsChange({ hexFillOpacity: parseFloat(e.target.value) })}
+            />
+          </div>
+        )}
+
         <div className="panel-row mb-2">
           <span className="panel-row-label">Show Coordinates</span>
           <button
@@ -541,9 +608,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             {settings?.showCoordinates ? 'On' : 'Off'}
           </button>
         </div>
-        
+
         <div className="panel-row mb-2">
-          <span className="panel-row-label">Show Data Indicators</span>
+          <span className="panel-row-label">Feature Markers</span>
           <button
             className={`btn btn-sm ${settings?.showDataIndicators ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => onSettingsChange({ showDataIndicators: !settings?.showDataIndicators })}
@@ -551,7 +618,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             {settings?.showDataIndicators ? 'On' : 'Off'}
           </button>
         </div>
-        
+
         <div className="panel-row mb-2">
           <span className="panel-row-label">Faction Territories</span>
           <button
@@ -561,7 +628,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             {settings?.showFactionTerritories ? 'On' : 'Off'}
           </button>
         </div>
-        
+
         <div className="panel-row mb-2">
           <span className="panel-row-label">Fog of War</span>
           <button

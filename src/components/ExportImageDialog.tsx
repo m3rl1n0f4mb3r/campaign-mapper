@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import type { CampaignSettings } from '@/lib/types';
 
 export type ImageFormat = 'png' | 'jpeg' | 'webp';
 
@@ -8,12 +9,14 @@ export interface ImageExportOptions {
   quality: number;
   includeBackground: boolean;
   backgroundOpacity: number;
-  includeHexOutlines: boolean;
-  hexOutlineOpacity: number;
+  showGrid: boolean;
+  gridOpacity: number;
   hexFillOpacity: number;
-  includeCoordinates: boolean;
-  includeFeatureMarkers: boolean;
-  includeTerrainSymbols: boolean;
+  showTerrainColors: boolean;
+  showCoordinates: boolean;
+  showFeatureMarkers: boolean;
+  showFactionTerritories: boolean;
+  showFogOfWar: boolean;
   scale: number;
 }
 
@@ -21,6 +24,9 @@ interface ExportImageDialogProps {
   isOpen: boolean;
   mapName: string;
   hasBackgroundImage: boolean;
+  backgroundImageVisible?: boolean;
+  backgroundImageOpacity?: number;
+  mapSettings?: CampaignSettings;
   onClose: () => void;
   onExport: (options: ImageExportOptions) => void;
 }
@@ -31,12 +37,14 @@ const DEFAULT_OPTIONS: ImageExportOptions = {
   quality: 85,
   includeBackground: true,
   backgroundOpacity: 100,
-  includeHexOutlines: true,
-  hexOutlineOpacity: 30,
+  showGrid: true,
+  gridOpacity: 30,
   hexFillOpacity: 50,
-  includeCoordinates: true,
-  includeFeatureMarkers: true,
-  includeTerrainSymbols: true,
+  showTerrainColors: true,
+  showCoordinates: true,
+  showFeatureMarkers: true,
+  showFactionTerritories: true,
+  showFogOfWar: false,
   scale: 1,
 };
 
@@ -44,6 +52,9 @@ const ExportImageDialog: React.FC<ExportImageDialogProps> = ({
   isOpen,
   mapName,
   hasBackgroundImage,
+  backgroundImageVisible,
+  backgroundImageOpacity,
+  mapSettings,
   onClose,
   onExport,
 }) => {
@@ -66,6 +77,23 @@ const ExportImageDialog: React.FC<ExportImageDialogProps> = ({
     setOptions(prev => ({ ...prev, [key]: value }));
   }, []);
 
+  const handleUseMapSettings = useCallback(() => {
+    if (!mapSettings) return;
+    setOptions(prev => ({
+      ...prev,
+      includeBackground: backgroundImageVisible ?? true,
+      backgroundOpacity: Math.round((backgroundImageOpacity ?? 1) * 100),
+      showGrid: mapSettings.showGrid,
+      gridOpacity: Math.round((mapSettings.gridOpacity ?? 0.3) * 100),
+      hexFillOpacity: Math.round(mapSettings.hexFillOpacity * 100),
+      showTerrainColors: mapSettings.showTerrainColors,
+      showCoordinates: mapSettings.showCoordinates,
+      showFeatureMarkers: mapSettings.showDataIndicators,
+      showFactionTerritories: mapSettings.showFactionTerritories,
+      showFogOfWar: mapSettings.showExploredStatus,
+    }));
+  }, [mapSettings, backgroundImageVisible, backgroundImageOpacity]);
+
   const handleExport = useCallback(() => {
     onExport(options);
   }, [options, onExport]);
@@ -81,6 +109,21 @@ const ExportImageDialog: React.FC<ExportImageDialogProps> = ({
         </div>
 
         <div className="modal-content">
+          {/* Quick settings */}
+          {mapSettings && (
+            <div className="form-group">
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={handleUseMapSettings}
+              >
+                Use Map Display Settings
+              </button>
+              <p className="text-muted text-sm mt-1">
+                Copy current visibility settings from the map
+              </p>
+            </div>
+          )}
+
           {/* Filename */}
           <div className="form-group">
             <label className="form-label">Filename</label>
@@ -168,42 +211,29 @@ const ExportImageDialog: React.FC<ExportImageDialogProps> = ({
             <label className="form-label">Hex Rendering</label>
 
             <div className="panel-row mb-2">
-              <span className="text-sm">Show Hex Outlines</span>
+              <span className="text-sm">Show Grid</span>
               <button
-                className={`btn btn-sm ${options.includeHexOutlines ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handleChange('includeHexOutlines', !options.includeHexOutlines)}
+                className={`btn btn-sm ${options.showGrid ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleChange('showGrid', !options.showGrid)}
               >
-                {options.includeHexOutlines ? 'Yes' : 'No'}
+                {options.showGrid ? 'On' : 'Off'}
               </button>
             </div>
 
-            {options.includeHexOutlines && (
-              <div className="panel-row mb-2">
-                <span className="text-sm">Outline Opacity: {options.hexOutlineOpacity}%</span>
+            {options.showGrid && (
+              <div className="panel-row">
+                <span className="text-sm">Grid Opacity: {options.gridOpacity}%</span>
                 <input
                   type="range"
                   className="form-range"
                   min="0"
                   max="100"
-                  value={options.hexOutlineOpacity}
-                  onChange={e => handleChange('hexOutlineOpacity', parseInt(e.target.value))}
+                  value={options.gridOpacity}
+                  onChange={e => handleChange('gridOpacity', parseInt(e.target.value))}
                   style={{ width: '120px' }}
                 />
               </div>
             )}
-
-            <div className="panel-row">
-              <span className="text-sm">Hex Fill Opacity: {options.hexFillOpacity}%</span>
-              <input
-                type="range"
-                className="form-range"
-                min="0"
-                max="100"
-                value={options.hexFillOpacity}
-                onChange={e => handleChange('hexFillOpacity', parseInt(e.target.value))}
-                style={{ width: '120px' }}
-              />
-            </div>
           </div>
 
           {/* Labels & Markers Section */}
@@ -211,32 +241,67 @@ const ExportImageDialog: React.FC<ExportImageDialogProps> = ({
             <label className="form-label">Labels & Markers</label>
 
             <div className="panel-row mb-2">
-              <span className="text-sm">Hex Coordinates</span>
+              <span className="text-sm">Show Terrain Colors</span>
               <button
-                className={`btn btn-sm ${options.includeCoordinates ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handleChange('includeCoordinates', !options.includeCoordinates)}
+                className={`btn btn-sm ${options.showTerrainColors ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleChange('showTerrainColors', !options.showTerrainColors)}
               >
-                {options.includeCoordinates ? 'Show' : 'Hide'}
+                {options.showTerrainColors ? 'On' : 'Off'}
+              </button>
+            </div>
+
+            {options.showTerrainColors && (
+              <div className="panel-row mb-2">
+                <span className="text-sm">Hex Fill Opacity: {options.hexFillOpacity}%</span>
+                <input
+                  type="range"
+                  className="form-range"
+                  min="0"
+                  max="100"
+                  value={options.hexFillOpacity}
+                  onChange={e => handleChange('hexFillOpacity', parseInt(e.target.value))}
+                  style={{ width: '120px' }}
+                />
+              </div>
+            )}
+
+            <div className="panel-row mb-2">
+              <span className="text-sm">Show Coordinates</span>
+              <button
+                className={`btn btn-sm ${options.showCoordinates ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleChange('showCoordinates', !options.showCoordinates)}
+              >
+                {options.showCoordinates ? 'On' : 'Off'}
               </button>
             </div>
 
             <div className="panel-row mb-2">
-              <span className="text-sm">Terrain Symbols</span>
+              <span className="text-sm">Feature Markers</span>
               <button
-                className={`btn btn-sm ${options.includeTerrainSymbols ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handleChange('includeTerrainSymbols', !options.includeTerrainSymbols)}
+                className={`btn btn-sm ${options.showFeatureMarkers ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleChange('showFeatureMarkers', !options.showFeatureMarkers)}
               >
-                {options.includeTerrainSymbols ? 'Show' : 'Hide'}
+                {options.showFeatureMarkers ? 'On' : 'Off'}
+              </button>
+            </div>
+
+            <div className="panel-row mb-2">
+              <span className="text-sm">Faction Territories</span>
+              <button
+                className={`btn btn-sm ${options.showFactionTerritories ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleChange('showFactionTerritories', !options.showFactionTerritories)}
+              >
+                {options.showFactionTerritories ? 'On' : 'Off'}
               </button>
             </div>
 
             <div className="panel-row">
-              <span className="text-sm">Feature Markers</span>
+              <span className="text-sm">Fog of War</span>
               <button
-                className={`btn btn-sm ${options.includeFeatureMarkers ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handleChange('includeFeatureMarkers', !options.includeFeatureMarkers)}
+                className={`btn btn-sm ${options.showFogOfWar ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleChange('showFogOfWar', !options.showFogOfWar)}
               >
-                {options.includeFeatureMarkers ? 'Show' : 'Hide'}
+                {options.showFogOfWar ? 'On' : 'Off'}
               </button>
             </div>
           </div>
@@ -266,7 +331,7 @@ const ExportImageDialog: React.FC<ExportImageDialogProps> = ({
             Cancel
           </button>
           <button className="btn btn-primary" onClick={handleExport}>
-            Export PNG
+            Export {options.format.toUpperCase()}
           </button>
         </div>
       </div>

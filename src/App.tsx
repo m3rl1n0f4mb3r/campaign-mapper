@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import type { 
-  CampaignMap, 
-  HexCoord, 
+import type {
+  CampaignMap,
+  HexCoord,
   Hex,
   Faction,
   CampaignSettings,
   GridConfig,
   MapMode,
+  ImageOverlay,
 } from '@/lib/types';
 import { coordToKey } from '@/lib/types';
 import {
@@ -253,7 +254,16 @@ function App() {
     if (!currentMap) return;
     setCurrentMap(updateGridConfig(currentMap, updates));
   }, [currentMap]);
-  
+
+  const handleImageOverlayChange = useCallback((updates: Partial<ImageOverlay>) => {
+    if (!currentMap || !currentMap.imageOverlay) return;
+    setCurrentMap({
+      ...currentMap,
+      imageOverlay: { ...currentMap.imageOverlay, ...updates },
+      updatedAt: new Date().toISOString(),
+    });
+  }, [currentMap]);
+
   // Map operations
   const handleNewMap = useCallback(() => {
     setShowNewMapDialog(true);
@@ -734,8 +744,10 @@ function App() {
               <SettingsPanel
                 settings={currentMap.settings}
                 gridConfig={currentMap.gridConfig}
+                imageOverlay={currentMap.imageOverlay}
                 onSettingsChange={handleSettingsChange}
                 onGridConfigChange={handleGridConfigChange}
+                onImageOverlayChange={handleImageOverlayChange}
                 onClose={handleCloseSidebar}
               />
             )}
@@ -772,6 +784,9 @@ function App() {
         isOpen={showExportDialog}
         mapName={currentMap?.name || 'map'}
         hasBackgroundImage={!!currentMap?.imageOverlay?.src}
+        backgroundImageVisible={currentMap?.imageOverlay?.visible}
+        backgroundImageOpacity={currentMap?.imageOverlay?.opacity}
+        mapSettings={currentMap?.settings}
         onClose={() => setShowExportDialog(false)}
         onExport={handleExportWithOptions}
       />
