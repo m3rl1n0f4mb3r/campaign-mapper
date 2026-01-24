@@ -105,6 +105,9 @@ export interface HexCampaignData {
   // Custom user-defined fields (for programmatic use)
   customFields?: Record<string, string | number | boolean>;
 
+  // External links - key is label, value is URL
+  links?: Record<string, string>;
+
   // State tracking
   explored?: boolean;
   hidden?: boolean;
@@ -146,6 +149,7 @@ export function hexHasUserData(hex: Hex): boolean {
     data.terrainOverride ||
     data.featureOverride ||
     (data.customFields && Object.keys(data.customFields).length > 0) ||
+    (data.links && Object.keys(data.links).length > 0) ||
     data.explored ||
     data.hidden
   );
@@ -280,6 +284,7 @@ export interface CampaignSettings {
   showTerrainColors: boolean;
   showGrid: boolean;
   showCoordinates: boolean;
+  showLinkIndicators: boolean;
   hexFillOpacity: number;
   gridOpacity: number;
 
@@ -297,6 +302,7 @@ export const DEFAULT_CAMPAIGN_SETTINGS: CampaignSettings = {
   showTerrainColors: true,
   showGrid: true,
   showCoordinates: true,
+  showLinkIndicators: true,
   hexFillOpacity: 0.5,
   gridOpacity: 0.3,
   availableTags: [], // User-defined tags only

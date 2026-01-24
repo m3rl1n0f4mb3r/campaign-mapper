@@ -18,6 +18,7 @@ export interface ImageExportOptions {
   showTerrainColors?: boolean;
   showCoordinates?: boolean;
   showFeatureMarkers?: boolean;
+  showLinkIndicators?: boolean;
   showFactionTerritories?: boolean;
   showFogOfWar?: boolean;
   scale?: number;
@@ -35,6 +36,7 @@ const DEFAULT_OPTIONS: Required<Omit<ImageExportOptions, 'backgroundImage'>> = {
   showTerrainColors: true,
   showCoordinates: true,
   showFeatureMarkers: true,
+  showLinkIndicators: true,
   showFactionTerritories: true,
   showFogOfWar: false,
   scale: 1,
@@ -170,6 +172,17 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
     });
   } else {
     clone.querySelectorAll('.hex-feature-indicator').forEach(el => el.remove());
+  }
+
+  // Handle link indicators
+  if (opts.showLinkIndicators) {
+    // Style link indicator text
+    clone.querySelectorAll('.hex-link-indicator text').forEach(el => {
+      const text = el as SVGTextElement;
+      text.style.pointerEvents = 'none';
+    });
+  } else {
+    clone.querySelectorAll('.hex-link-indicator').forEach(el => el.remove());
   }
 
   // Handle faction territories

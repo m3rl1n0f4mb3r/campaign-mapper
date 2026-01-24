@@ -125,6 +125,15 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   const [isAddingFeatureNote, setIsAddingFeatureNote] = useState(false);
   const [isEditingFeatureNotes, setIsEditingFeatureNotes] = useState(false);
 
+  // Links state
+  const [newLinkLabel, setNewLinkLabel] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [isAddingLink, setIsAddingLink] = useState(false);
+  const [isEditingLinks, setIsEditingLinks] = useState(false);
+  const [editingLinkLabel, setEditingLinkLabel] = useState<string | null>(null);
+  const [editLinkLabel, setEditLinkLabel] = useState('');
+  const [editLinkUrl, setEditLinkUrl] = useState('');
+
   // Overview edit mode state
   const [isEditingOverview, setIsEditingOverview] = useState(false);
   const [isEditingTags, setIsEditingTags] = useState(false);
@@ -485,6 +494,58 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
 
     return sorted;
   }, [hex.featureType, campaignData.featureNotes]);
+
+  // Links handlers
+  const handleAddLink = useCallback(() => {
+    if (!newLinkLabel.trim() || !newLinkUrl.trim()) return;
+    const links = campaignData.links || {};
+    // Don't overwrite existing links with same label
+    if (!(newLinkLabel.trim() in links)) {
+      onUpdate({ links: { ...links, [newLinkLabel.trim()]: newLinkUrl.trim() } });
+    }
+    setNewLinkLabel('');
+    setNewLinkUrl('');
+    setIsAddingLink(false);
+  }, [newLinkLabel, newLinkUrl, campaignData.links, onUpdate]);
+
+  const handleDeleteLink = useCallback((label: string) => {
+    const links = { ...campaignData.links };
+    delete links[label];
+    onUpdate({ links: Object.keys(links).length > 0 ? links : undefined });
+  }, [campaignData.links, onUpdate]);
+
+  const handleStartEditLink = useCallback((label: string) => {
+    const url = campaignData.links?.[label] || '';
+    setEditingLinkLabel(label);
+    setEditLinkLabel(label);
+    setEditLinkUrl(url);
+  }, [campaignData.links]);
+
+  const handleSaveEditLink = useCallback(() => {
+    if (!editingLinkLabel || !editLinkLabel.trim() || !editLinkUrl.trim()) return;
+    const links = { ...campaignData.links };
+    // Remove old label if it changed
+    if (editingLinkLabel !== editLinkLabel.trim()) {
+      delete links[editingLinkLabel];
+    }
+    // Add with new/same label
+    links[editLinkLabel.trim()] = editLinkUrl.trim();
+    onUpdate({ links });
+    setEditingLinkLabel(null);
+    setEditLinkLabel('');
+    setEditLinkUrl('');
+  }, [editingLinkLabel, editLinkLabel, editLinkUrl, campaignData.links, onUpdate]);
+
+  const handleCancelEditLink = useCallback(() => {
+    setEditingLinkLabel(null);
+    setEditLinkLabel('');
+    setEditLinkUrl('');
+  }, []);
+
+  // Get link entries as array for display
+  const linkEntries = React.useMemo(() => {
+    return Object.entries(campaignData.links || {}).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [campaignData.links]);
 
   // Faction territory handlers
   const handleAddToFaction = useCallback((factionId: string) => {
@@ -1369,6 +1430,7 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
       
       {/* Campaign Tab */}
       {activeTab === 'campaign' && (
+        <>
         <div className="panel">
           <div className="panel-header">
             <span className="panel-title">Campaign Notes</span>
@@ -1489,6 +1551,178 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
             )}
           </div>
         </div>
+
+        {/* Links Section */}
+        <div className="panel">
+          <div className="panel-header">
+            <span className="panel-title">Links</span>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setIsEditingLinks(!isEditingLinks)}
+              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+            >
+              {isEditingLinks ? 'Done' : 'Edit'}
+            </button>
+          </div>
+          <div className="panel-content">
+            {isEditingLinks ? (
+              <>
+                {/* Edit mode - show links with edit/delete buttons */}
+                {linkEntries.map(([label, url]) => (
+                  editingLinkLabel === label ? (
+                    <div key={label} className="form-group mb-3" style={{ padding: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px' }}>
+                      <label className="form-label">Label</label>
+                      <input
+                        type="text"
+                        className="form-input mb-2"
+                        value={editLinkLabel}
+                        onChange={(e) => setEditLinkLabel(e.target.value)}
+                        autoFocus
+                      />
+                      <label className="form-label">URL</label>
+                      <input
+                        type="url"
+                        className="form-input mb-2"
+                        value={editLinkUrl}
+                        onChange={(e) => setEditLinkUrl(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveEditLink();
+                          if (e.key === 'Escape') handleCancelEditLink();
+                        }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={handleSaveEditLink}
+                          disabled={!editLinkLabel.trim() || !editLinkUrl.trim()}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={handleCancelEditLink}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={label} className="panel-row mb-2" style={{ alignItems: 'center' }}>
+                      <span className="panel-row-label" style={{ flex: 1 }}>{label}</span>
+                      <span className="text-muted text-sm" style={{ flex: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {url}
+                      </span>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => handleStartEditLink(label)}
+                        title={`Edit "${label}" link`}
+                        style={{ padding: '2px 6px', fontSize: '0.75rem', marginLeft: '8px' }}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => handleDeleteLink(label)}
+                        title={`Delete "${label}" link`}
+                        style={{ padding: '2px 6px', fontSize: '0.75rem' }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )
+                ))}
+
+                {/* Empty state */}
+                {linkEntries.length === 0 && !isAddingLink && !editingLinkLabel && (
+                  <p className="text-muted text-sm mb-3">No links yet. Add one below.</p>
+                )}
+
+                {/* Add new link */}
+                {isAddingLink ? (
+                  <div className="form-group">
+                    <label className="form-label">Label</label>
+                    <input
+                      type="text"
+                      className="form-input mb-2"
+                      value={newLinkLabel}
+                      onChange={(e) => setNewLinkLabel(e.target.value)}
+                      placeholder="e.g., World Anvil, Session Notes..."
+                      autoFocus
+                    />
+                    <label className="form-label">URL</label>
+                    <input
+                      type="url"
+                      className="form-input mb-2"
+                      value={newLinkUrl}
+                      onChange={(e) => setNewLinkUrl(e.target.value)}
+                      placeholder="https://..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleAddLink();
+                        if (e.key === 'Escape') {
+                          setIsAddingLink(false);
+                          setNewLinkLabel('');
+                          setNewLinkUrl('');
+                        }
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={handleAddLink}
+                        disabled={!newLinkLabel.trim() || !newLinkUrl.trim()}
+                      >
+                        Add
+                      </button>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          setIsAddingLink(false);
+                          setNewLinkLabel('');
+                          setNewLinkUrl('');
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setIsAddingLink(true)}
+                    style={{ width: '100%' }}
+                  >
+                    + Add Link
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                {/* View mode - show clickable links */}
+                {linkEntries.length > 0 ? (
+                  linkEntries.map(([label, url]) => (
+                    <div key={label} className="mb-2">
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: 'var(--accent-primary)',
+                          textDecoration: 'none',
+                        }}
+                        title={url}
+                      >
+                        🔗 {label}
+                      </a>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-muted text-sm">No links yet. Click Edit to add some.</p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+        </>
       )}
 
       {/* Generate Tab */}

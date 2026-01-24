@@ -620,6 +620,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <div className="panel-row mb-2">
+          <span className="panel-row-label">Link Indicators</span>
+          <button
+            className={`btn btn-sm ${settings?.showLinkIndicators ?? true ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => onSettingsChange({ showLinkIndicators: !(settings?.showLinkIndicators ?? true) })}
+          >
+            {(settings?.showLinkIndicators ?? true) ? 'On' : 'Off'}
+          </button>
+        </div>
+
+        <div className="panel-row mb-2">
           <span className="panel-row-label">Faction Territories</span>
           <button
             className={`btn btn-sm ${settings?.showFactionTerritories ? 'btn-primary' : 'btn-secondary'}`}
