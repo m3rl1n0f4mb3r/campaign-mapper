@@ -89,6 +89,8 @@ interface HexCellProps {
   showDataIndicator: boolean;
   showCoordinates: boolean;
   showGrid: boolean;
+  showLinkIndicators: boolean;
+  hasLinks: boolean;
   factionColor?: string;
   isExplored: boolean;
   showExploredStatus: boolean;
@@ -110,6 +112,8 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
   showDataIndicator,
   showCoordinates,
   showGrid,
+  showLinkIndicators,
+  hasLinks,
   factionColor,
   isExplored,
   showExploredStatus,
@@ -226,7 +230,29 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
           r={4}
         />
       )}
-      
+
+      {/* Link indicator */}
+      {showLinkIndicators && hasLinks && (!showExploredStatus || isExplored) && (
+        <g className="hex-link-indicator">
+          <circle
+            cx={gridConfig.orientation === 'pointy-top' ? gridConfig.hexSize * 0.55 : gridConfig.hexSize * 0.5}
+            cy={gridConfig.orientation === 'pointy-top' ? -hexHeight * 0.15 : gridConfig.hexSize * 0.5}
+            r={7}
+            fill="#4a90d9"
+          />
+          <text
+            x={gridConfig.orientation === 'pointy-top' ? gridConfig.hexSize * 0.55 : gridConfig.hexSize * 0.5}
+            y={gridConfig.orientation === 'pointy-top' ? -hexHeight * 0.15 : gridConfig.hexSize * 0.5}
+            fill="#fff"
+            fontSize="8"
+            textAnchor="middle"
+            dominantBaseline="central"
+          >
+            🔗
+          </text>
+        </g>
+      )}
+
       {/* Coordinate label */}
       {showCoordinates && (!showExploredStatus || isExplored) && (
         <text
@@ -563,6 +589,8 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
                 showDataIndicator={settings?.showDataIndicators ?? true}
                 showCoordinates={settings?.showCoordinates ?? true}
                 showGrid={settings?.showGrid ?? true}
+                showLinkIndicators={settings?.showLinkIndicators ?? true}
+                hasLinks={!!(hex.campaignData?.links && Object.keys(hex.campaignData.links).length > 0)}
                 factionColor={factionColor}
                 isExplored={isExplored}
                 showExploredStatus={settings?.showExploredStatus ?? false}
