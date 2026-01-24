@@ -1,6 +1,6 @@
 {
   "name": "campaign-mapper",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Hex Map Campaign Manager for TTRPGs - overlay images, generate terrain, track campaigns",
   "type": "module",
   "scripts": {
