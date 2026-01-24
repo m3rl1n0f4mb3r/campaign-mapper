@@ -263,6 +263,13 @@ export async function exportMapAsImage(
     throw new Error('Failed to get canvas context');
   }
 
+  // Fill with dark background color if no background image
+  // This matches the app's dark theme for maps without image overlays
+  if (!backgroundImage || !opts.includeBackground) {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  }
+
   // Scale the context to match resolution
   ctx.scale(scale, scale);
 
