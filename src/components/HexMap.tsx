@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState, useRef } from 'react';
+import React, { useMemo, useCallback, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import type { Hex, HexCoord, GridConfig, TerrainType, Faction, ImageOverlay, CampaignSettings } from '@/lib/types';
 import { coordToKey, hexHasUserData, getEffectiveTerrain, DEFAULT_TERRAIN_TYPES } from '@/lib/types';
 import { 
@@ -25,6 +25,12 @@ interface HexMapProps {
   onHexHover?: (coord: HexCoord | null) => void;
   onBoxSelect?: (coords: HexCoord[]) => void;
   onZoomChange?: (zoom: number) => void;
+}
+
+// Handle for accessing HexMap internals (used for image export)
+export interface HexMapHandle {
+  getSvgElement: () => SVGSVGElement | null;
+  getBackgroundImage: () => string | undefined;
 }
 
 // Generate a consistent color for a faction
@@ -82,10 +88,12 @@ interface HexCellProps {
   showTerrainColors: boolean;
   showDataIndicator: boolean;
   showCoordinates: boolean;
+  showGrid: boolean;
   factionColor?: string;
   isExplored: boolean;
   showExploredStatus: boolean;
   fillOpacity: number;
+  gridOpacity: number;
   onClick: (event: React.MouseEvent) => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -101,10 +109,12 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
   showTerrainColors,
   showDataIndicator,
   showCoordinates,
+  showGrid,
   factionColor,
   isExplored,
   showExploredStatus,
   fillOpacity,
+  gridOpacity,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -151,6 +161,9 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
     <g
       className={classNames}
       transform={`translate(${x}, ${y})`}
+      data-coord={displayCoord}
+      data-coord-x={coordOffset.x}
+      data-coord-y={coordOffset.y}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -161,10 +174,17 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
         points={getHexPoints(0, 0, gridConfig)}
         fill={fillColor}
         fillOpacity={opacity}
+        data-terrain-color={terrain.color}
+        data-terrain-symbol={terrain.symbol || ''}
+        data-grid-opacity={gridOpacity}
         style={factionColor && !isSelected && !isMultiSelected ? {
           stroke: factionColor,
           strokeWidth: 3,
-        } : undefined}
+        } : showGrid ? {
+          strokeOpacity: gridOpacity,
+        } : {
+          stroke: 'none',
+        }}
       />
       
       {/* Terrain symbol */}
@@ -252,7 +272,7 @@ const SelectionBox: React.FC<SelectionBoxProps> = ({ startX, startY, currentX, c
   );
 };
 
-const HexMap: React.FC<HexMapProps> = ({
+const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
   hexes,
   gridConfig,
   settings,
@@ -266,7 +286,7 @@ const HexMap: React.FC<HexMapProps> = ({
   onHexHover,
   onBoxSelect,
   onZoomChange,
-}) => {
+}, ref) => {
   // Box selection state
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
@@ -274,6 +294,12 @@ const HexMap: React.FC<HexMapProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const didDragRef = useRef(false); // Track if we just completed a drag
+
+  // Expose methods for image export
+  useImperativeHandle(ref, () => ({
+    getSvgElement: () => svgRef.current,
+    getBackgroundImage: () => imageOverlay?.src,
+  }));
   
   // Native wheel event listener for zoom (needs passive: false to preventDefault)
   React.useEffect(() => {
@@ -536,10 +562,12 @@ const HexMap: React.FC<HexMapProps> = ({
                 showTerrainColors={settings?.showTerrainColors ?? true}
                 showDataIndicator={settings?.showDataIndicators ?? true}
                 showCoordinates={settings?.showCoordinates ?? true}
+                showGrid={settings?.showGrid ?? true}
                 factionColor={factionColor}
                 isExplored={isExplored}
                 showExploredStatus={settings?.showExploredStatus ?? false}
                 fillOpacity={settings?.hexFillOpacity ?? 0.5}
+                gridOpacity={settings?.gridOpacity ?? 0.3}
                 onClick={(e) => handleHexClick(hex, e)}
                 onMouseEnter={() => handleMouseEnter(hex)}
                 onMouseLeave={handleMouseLeave}
@@ -560,6 +588,8 @@ const HexMap: React.FC<HexMapProps> = ({
       </svg>
     </div>
   );
-};
+});
+
+HexMap.displayName = 'HexMap';
 
 export default HexMap;

@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import type { 
-  CampaignMap, 
-  HexCoord, 
+import type {
+  CampaignMap,
+  HexCoord,
   Hex,
   Faction,
   CampaignSettings,
   GridConfig,
   MapMode,
+  ImageOverlay,
 } from '@/lib/types';
 import { coordToKey } from '@/lib/types';
 import {
@@ -33,7 +34,9 @@ import {
   loadAppSettings,
 } from '@/lib/storage';
 
-import HexMap from '@/components/HexMap';
+import HexMap, { type HexMapHandle } from '@/components/HexMap';
+import { exportMapAsImage, type ImageExportOptions } from '@/lib/imageExport';
+import ExportImageDialog from '@/components/ExportImageDialog';
 import HexDetailPanel from '@/components/HexDetailPanel';
 import MultiSelectPanel from '@/components/MultiSelectPanel';
 import SettingsPanel from '@/components/SettingsPanel';
@@ -52,11 +55,15 @@ function App() {
   const [sidebarView, setSidebarView] = useState<SidebarView>('none');
   const [showNewMapDialog, setShowNewMapDialog] = useState(false);
   const [showMapList, setShowMapList] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [hexListFilter, setHexListFilter] = useState<StatsFilterType | null>(null);
 
   // Ref for map container (for scrolling to hexes)
   const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // Ref for HexMap (for image export)
+  const hexMapRef = useRef<HexMapHandle>(null);
 
   // Load last map on mount
   useEffect(() => {
@@ -247,7 +254,16 @@ function App() {
     if (!currentMap) return;
     setCurrentMap(updateGridConfig(currentMap, updates));
   }, [currentMap]);
-  
+
+  const handleImageOverlayChange = useCallback((updates: Partial<ImageOverlay>) => {
+    if (!currentMap || !currentMap.imageOverlay) return;
+    setCurrentMap({
+      ...currentMap,
+      imageOverlay: { ...currentMap.imageOverlay, ...updates },
+      updatedAt: new Date().toISOString(),
+    });
+  }, [currentMap]);
+
   // Map operations
   const handleNewMap = useCallback(() => {
     setShowNewMapDialog(true);
@@ -371,6 +387,31 @@ function App() {
       } catch (err) {
         alert('Failed to export map: ' + (err as Error).message);
       }
+    }
+  }, [currentMap]);
+
+  const handleExportMapAsImage = useCallback(() => {
+    if (!currentMap) return;
+    setShowExportDialog(true);
+  }, [currentMap]);
+
+  const handleExportWithOptions = useCallback(async (options: ImageExportOptions) => {
+    if (!currentMap || !hexMapRef.current) return;
+
+    const svg = hexMapRef.current.getSvgElement();
+    if (!svg) {
+      alert('Unable to export: map not ready');
+      return;
+    }
+
+    try {
+      await exportMapAsImage(svg, {
+        ...options,
+        backgroundImage: hexMapRef.current.getBackgroundImage(),
+      });
+      setShowExportDialog(false);
+    } catch (err) {
+      alert('Failed to export image: ' + (err as Error).message);
     }
   }, [currentMap]);
   
@@ -598,6 +639,7 @@ function App() {
           onNewMap={handleNewMap}
           onOpenMap={handleOpenMap}
           onExportMap={handleExportMap}
+          onExportMapAsImage={handleExportMapAsImage}
           onImportMap={handleImportMap}
           onOpenSettings={handleOpenSettings}
           onMapNameChange={handleMapNameChange}
@@ -612,6 +654,7 @@ function App() {
           {currentMap ? (
             <>
               <HexMap
+                ref={hexMapRef}
                 hexes={currentMap.hexes}
                 gridConfig={currentMap.gridConfig}
                 settings={currentMap.settings}
@@ -701,8 +744,10 @@ function App() {
               <SettingsPanel
                 settings={currentMap.settings}
                 gridConfig={currentMap.gridConfig}
+                imageOverlay={currentMap.imageOverlay}
                 onSettingsChange={handleSettingsChange}
                 onGridConfigChange={handleGridConfigChange}
+                onImageOverlayChange={handleImageOverlayChange}
                 onClose={handleCloseSidebar}
               />
             )}
@@ -734,7 +779,18 @@ function App() {
         onClose={() => setShowNewMapDialog(false)}
         onCreate={handleCreateMap}
       />
-      
+
+      <ExportImageDialog
+        isOpen={showExportDialog}
+        mapName={currentMap?.name || 'map'}
+        hasBackgroundImage={!!currentMap?.imageOverlay?.src}
+        backgroundImageVisible={currentMap?.imageOverlay?.visible}
+        backgroundImageOpacity={currentMap?.imageOverlay?.opacity}
+        mapSettings={currentMap?.settings}
+        onClose={() => setShowExportDialog(false)}
+        onExport={handleExportWithOptions}
+      />
+
       {/* Map List Modal */}
       {showMapList && (
         <div className="modal-overlay" onClick={() => setShowMapList(false)}>

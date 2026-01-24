@@ -8,6 +8,7 @@ interface ToolbarProps {
   onNewMap: () => void;
   onOpenMap: () => void;
   onExportMap: () => void;
+  onExportMapAsImage: () => void;
   onImportMap: () => void;
   onOpenSettings: () => void;
   onMapNameChange: (name: string) => void;
@@ -25,6 +26,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onNewMap,
   onOpenMap,
   onExportMap,
+  onExportMapAsImage,
   onImportMap,
   onOpenSettings,
   onMapNameChange,
@@ -116,20 +118,29 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   Open / Manage...
                 </button>
                 <div className="toolbar-dropdown-divider" />
-                {map && (
-                  <button 
-                    className="toolbar-dropdown-item"
-                    onClick={() => { onExportMap(); setShowMapsMenu(false); }}
-                  >
-                    Export
-                  </button>
-                )}
-                <button 
+                <button
                   className="toolbar-dropdown-item"
                   onClick={() => { onImportMap(); setShowMapsMenu(false); }}
                 >
-                  Import
+                  Import (JSON)
                 </button>
+                {map && (
+                  <button
+                    className="toolbar-dropdown-item"
+                    onClick={() => { onExportMap(); setShowMapsMenu(false); }}
+                  >
+                    Export (JSON)
+                  </button>
+                )}
+                <div className="toolbar-dropdown-divider" />
+                {map && (
+                  <button
+                    className="toolbar-dropdown-item"
+                    onClick={() => { onExportMapAsImage(); setShowMapsMenu(false); }}
+                  >
+                    Export as Image
+                  </button>
+                )}
               </div>
             )}
           </div>
