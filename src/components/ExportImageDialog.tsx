@@ -15,6 +15,7 @@ export interface ImageExportOptions {
   showTerrainColors: boolean;
   showCoordinates: boolean;
   showFeatureMarkers: boolean;
+  showLinkIndicators: boolean;
   showFactionTerritories: boolean;
   showFogOfWar: boolean;
   scale: number;
@@ -43,6 +44,7 @@ const DEFAULT_OPTIONS: ImageExportOptions = {
   showTerrainColors: true,
   showCoordinates: true,
   showFeatureMarkers: true,
+  showLinkIndicators: true,
   showFactionTerritories: true,
   showFogOfWar: false,
   scale: 1,
@@ -89,6 +91,7 @@ const ExportImageDialog: React.FC<ExportImageDialogProps> = ({
       showTerrainColors: mapSettings.showTerrainColors,
       showCoordinates: mapSettings.showCoordinates,
       showFeatureMarkers: mapSettings.showDataIndicators,
+      showLinkIndicators: mapSettings.showLinkIndicators ?? true,
       showFactionTerritories: mapSettings.showFactionTerritories,
       showFogOfWar: mapSettings.showExploredStatus,
     }));
@@ -282,6 +285,16 @@ const ExportImageDialog: React.FC<ExportImageDialogProps> = ({
                 onClick={() => handleChange('showFeatureMarkers', !options.showFeatureMarkers)}
               >
                 {options.showFeatureMarkers ? 'On' : 'Off'}
+              </button>
+            </div>
+
+            <div className="panel-row mb-2">
+              <span className="text-sm">Link Indicators</span>
+              <button
+                className={`btn btn-sm ${options.showLinkIndicators ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleChange('showLinkIndicators', !options.showLinkIndicators)}
+              >
+                {options.showLinkIndicators ? 'On' : 'Off'}
               </button>
             </div>
 
