@@ -14,6 +14,7 @@ interface ToolbarProps {
   onMapNameChange: (name: string) => void;
   onStatsClick: (filter: StatsFilterType) => void;
   onOpenMarkers: () => void;
+  onOpenWhatsNew: () => void;
   selectedCount: number;
   onClearSelection: () => void;
   zoom: number;
@@ -33,6 +34,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onMapNameChange,
   onStatsClick,
   onOpenMarkers,
+  onOpenWhatsNew,
   selectedCount,
   onClearSelection,
   zoom,
@@ -144,6 +146,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     Export as Image
                   </button>
                 )}
+                <div className="toolbar-dropdown-divider" />
+                <button
+                  className="toolbar-dropdown-item"
+                  onClick={() => { onOpenWhatsNew(); setShowMapsMenu(false); }}
+                >
+                  What's New
+                </button>
               </div>
             )}
           </div>

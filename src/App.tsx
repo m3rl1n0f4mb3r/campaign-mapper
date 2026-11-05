@@ -42,7 +42,12 @@ import {
   importMap,
   deleteMap,
   loadAppSettings,
+  hasSavedAppSettings,
+  markVersionSeen,
 } from '@/lib/storage';
+import { APP_VERSION } from '@/lib/version';
+import { compareVersions, getReleasedEntries, getUnseenEntries, type ChangelogEntry } from '@/lib/changelog';
+import WhatsNewModal from '@/components/WhatsNewModal';
 
 import HexMap, { type HexMapHandle } from '@/components/HexMap';
 import { exportMapAsImage, type ImageExportOptions } from '@/lib/imageExport';
@@ -73,6 +78,8 @@ function App() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [hexListFilter, setHexListFilter] = useState<StatsFilterType | null>(null);
+  // Release notes being shown in What's New, or null when closed
+  const [whatsNewEntries, setWhatsNewEntries] = useState<ChangelogEntry[] | null>(null);
 
   // Ref for map container (for scrolling to hexes)
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -80,9 +87,11 @@ function App() {
   // Ref for HexMap (for image export)
   const hexMapRef = useRef<HexMapHandle>(null);
 
-  // Load last map on mount
+  // Load last map on mount, then show What's New to returning users
   useEffect(() => {
     async function loadLastMap() {
+      // Check before anything saves settings (opening a map does)
+      const isNewUser = !hasSavedAppSettings();
       const settings = loadAppSettings();
       if (settings.recentMaps.length > 0) {
         const lastMap = await loadMap(settings.recentMaps[0].id);
@@ -90,8 +99,30 @@ function App() {
           setCurrentMap(lastMap);
         }
       }
+
+      if (isNewUser) {
+        // Nothing to compare against; start tracking from this version
+        markVersionSeen(APP_VERSION);
+        return;
+      }
+      const unseen = getUnseenEntries(settings.lastSeenVersion);
+      if (unseen.length > 0) {
+        setWhatsNewEntries(unseen);
+      } else if (!settings.lastSeenVersion || compareVersions(settings.lastSeenVersion, APP_VERSION) < 0) {
+        // New version without release notes: nothing to show
+        markVersionSeen(APP_VERSION);
+      }
     }
     loadLastMap();
+  }, []);
+
+  const handleOpenWhatsNew = useCallback(() => {
+    setWhatsNewEntries(getReleasedEntries());
+  }, []);
+
+  const handleCloseWhatsNew = useCallback(() => {
+    markVersionSeen(APP_VERSION);
+    setWhatsNewEntries(null);
   }, []);
   
   // Auto-save on map changes
@@ -721,6 +752,7 @@ function App() {
           onMapNameChange={handleMapNameChange}
           onStatsClick={handleStatsClick}
           onOpenMarkers={handleOpenMarkers}
+          onOpenWhatsNew={handleOpenWhatsNew}
           selectedCount={multiSelectedCoords.length}
           onClearSelection={handleClearSelection}
           zoom={zoom}
@@ -873,6 +905,10 @@ function App() {
       )}
       
       {/* Dialogs */}
+      {whatsNewEntries && (
+        <WhatsNewModal entries={whatsNewEntries} onClose={handleCloseWhatsNew} />
+      )}
+
       <NewMapDialog
         isOpen={showNewMapDialog}
         onClose={() => setShowNewMapDialog(false)}
