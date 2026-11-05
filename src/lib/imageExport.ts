@@ -3,6 +3,8 @@
  * Exports the hex map as a PNG image for use in VTT applications
  */
 
+import { BASE_DECORATION_SIZES as SIZES } from './hexDecorations';
+
 export type ImageFormat = 'png' | 'jpeg' | 'webp';
 
 export interface ImageExportOptions {
@@ -70,6 +72,9 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
   const clone = svg.cloneNode(true) as SVGSVGElement;
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
+  // Same decoration scale the map rendered with, for elements created here
+  const hexScale = parseFloat(svg.getAttribute('data-hex-scale') || '1') || 1;
+
   // Remove selection highlighting classes (shouldn't appear in export)
   clone.querySelectorAll('.selected, .multi-selected').forEach(el => {
     el.classList.remove('selected', 'multi-selected');
@@ -116,7 +121,7 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
       if (!symbolEl) {
         // Create symbol element if it doesn't exist
         symbolEl = createSvgText(terrainSymbol, 0, 0, 'hex-symbol', {
-          fontSize: '16px',
+          fontSize: `${SIZES.symbolFont * hexScale}px`,
           textAnchor: 'middle',
           dominantBaseline: 'central',
           fill: 'rgba(255, 255, 255, 0.7)',
@@ -124,8 +129,7 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
         });
         group.appendChild(symbolEl);
       } else {
-        // Style existing symbol
-        symbolEl.style.fontSize = '16px';
+        // Style existing symbol (keeps the font size the map rendered)
         symbolEl.style.textAnchor = 'middle';
         symbolEl.style.dominantBaseline = 'central';
         symbolEl.style.fill = 'rgba(255, 255, 255, 0.7)';
@@ -145,15 +149,14 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
       if (!coordEl) {
         // Create coordinate element if it doesn't exist
         coordEl = createSvgText(coordValue, coordX, coordY, 'hex-coord', {
-          fontSize: '10px',
+          fontSize: `${SIZES.coordFont * hexScale}px`,
           textAnchor: 'middle',
           fill: 'rgba(255, 255, 255, 0.5)',
           pointerEvents: 'none',
         });
         group.appendChild(coordEl);
       } else {
-        // Style existing coordinate
-        coordEl.style.fontSize = '10px';
+        // Style existing coordinate (keeps the font size the map rendered)
         coordEl.style.textAnchor = 'middle';
         coordEl.style.fill = 'rgba(255, 255, 255, 0.5)';
         coordEl.style.pointerEvents = 'none';

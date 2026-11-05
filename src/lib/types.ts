@@ -287,6 +287,8 @@ export interface CampaignSettings {
   showLinkIndicators: boolean;
   hexFillOpacity: number;
   gridOpacity: number;
+  /** Label Size: user multiplier on top of hex-size-relative decoration sizes. 1 = 100% */
+  labelScale: number;
 
   // Available tags for quick selection
   availableTags: string[];
@@ -305,6 +307,7 @@ export const DEFAULT_CAMPAIGN_SETTINGS: CampaignSettings = {
   showLinkIndicators: true,
   hexFillOpacity: 0.5,
   gridOpacity: 0.3,
+  labelScale: 1,
   availableTags: [], // User-defined tags only
   customTerrainTypes: [],
 };

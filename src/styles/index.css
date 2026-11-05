@@ -343,20 +343,21 @@ body {
   transition: all var(--transition-fast);
 }
 
+/* Highlight strokes scale with --hex-scale (set on the map SVG). Grid lines stay 1px. */
 .hex.selected .hex-polygon {
   stroke: var(--selection);
-  stroke-width: 3;
-  filter: drop-shadow(0 0 4px var(--selection));
+  stroke-width: calc(3px * var(--hex-scale, 1));
+  filter: drop-shadow(0 0 calc(4px * var(--hex-scale, 1)) var(--selection));
 }
 
 .hex.multi-selected .hex-polygon {
   stroke: var(--multi-selection);
-  stroke-width: 2;
+  stroke-width: calc(2px * var(--hex-scale, 1));
 }
 
 .hex.has-data .hex-polygon {
   stroke: var(--data-indicator);
-  stroke-width: 2;
+  stroke-width: calc(2px * var(--hex-scale, 1));
 }
 
 .hex.selected.has-data .hex-polygon {
@@ -365,7 +366,7 @@ body {
 
 .hex.neighbor .hex-polygon {
   stroke: var(--info);
-  stroke-width: 1.5;
+  stroke-width: calc(1.5px * var(--hex-scale, 1));
   stroke-opacity: 0.6;
 }
 
@@ -374,7 +375,6 @@ body {
 }
 
 .hex-symbol {
-  font-size: 14px;
   fill: rgba(0, 0, 0, 0.5);
   pointer-events: none;
   text-anchor: middle;
@@ -385,7 +385,6 @@ body {
 }
 
 .hex-coord {
-  font-size: 8px;
   fill: rgba(0, 0, 0, 0.4);
   pointer-events: none;
   text-anchor: middle;
@@ -897,6 +896,46 @@ body {
   padding: 4px 8px;
   min-width: 32px;
   font-size: 10px;
+}
+
+.label-size-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.label-size-row .form-range {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Fits 4 digits (up to 1000); matches .increment-input styling */
+.label-size-input {
+  flex: 0 0 auto;
+  width: 60px;
+  text-align: right;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.label-size-input::-webkit-outer-spin-button,
+.label-size-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.label-size-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.label-size-unit {
+  margin-left: calc(-1 * var(--spacing-xs));
+  color: var(--text-secondary);
+}
+
+.label-size-row .btn {
+  white-space: nowrap;
 }
 
 .increment-input {

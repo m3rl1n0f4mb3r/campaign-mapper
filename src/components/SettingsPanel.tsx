@@ -2,6 +2,13 @@ import React, { useCallback, useMemo, useState } from 'react';
 import type { CampaignSettings, GridConfig, TerrainType, ImageOverlay } from '@/lib/types';
 import { DEFAULT_TERRAIN_TYPES } from '@/lib/types';
 import { getHexSpacing, getHexDimensions } from '@/lib/hexUtils';
+import {
+  clampLabelScale,
+  LABEL_SCALE_DEFAULT,
+  LABEL_SCALE_MAX,
+  LABEL_SCALE_MIN,
+  LABEL_SCALE_SLIDER_MAX,
+} from '@/lib/hexDecorations';
 
 interface SettingsPanelProps {
   settings: CampaignSettings;
@@ -113,6 +120,73 @@ const IncrementControl: React.FC<IncrementControlProps> = ({
           title={`+${step}`}
         >
           ▶▶
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Label Size: slider (25-300%, stretches for larger values) + number box + reset
+interface LabelSizeControlProps {
+  value: number;
+  onChange: (value: number) => void;
+}
+
+const LabelSizeControl: React.FC<LabelSizeControlProps> = ({ value, onChange }) => {
+  const percent = Math.round(value * 100);
+  const minPercent = LABEL_SCALE_MIN * 100;
+  const sliderMax = Math.max(LABEL_SCALE_SLIDER_MAX * 100, percent);
+  const defaultPercent = LABEL_SCALE_DEFAULT * 100;
+
+  // Text being typed in the number box; null when not editing
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const setPercent = (p: number) => onChange(clampLabelScale(p / 100));
+
+  // Out-of-range values clamp; empty or invalid input reverts
+  const commitDraft = () => {
+    if (draft === null) return;
+    const parsed = parseInt(draft, 10);
+    if (!isNaN(parsed)) setPercent(parsed);
+    setDraft(null);
+  };
+
+  return (
+    <div className="form-group">
+      <label className="form-label" htmlFor="label-size-slider">Label Size</label>
+      <div className="label-size-row">
+        <input
+          id="label-size-slider"
+          type="range"
+          className="form-range"
+          min={minPercent}
+          max={sliderMax}
+          step={5}
+          value={percent}
+          onChange={e => setPercent(Number(e.target.value))}
+        />
+        <input
+          type="number"
+          className="form-input label-size-input"
+          aria-label="Label size percent"
+          min={minPercent}
+          max={LABEL_SCALE_MAX * 100}
+          step={5}
+          value={draft ?? percent}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commitDraft}
+          onKeyDown={e => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+            if (e.key === 'Escape') setDraft(null);
+          }}
+        />
+        <span className="label-size-unit">%</span>
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={() => onChange(LABEL_SCALE_DEFAULT)}
+          disabled={percent === defaultPercent}
+        >
+          ↺ {defaultPercent}%
         </button>
       </div>
     </div>
@@ -608,6 +682,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             {settings?.showCoordinates ? 'On' : 'Off'}
           </button>
         </div>
+
+        <LabelSizeControl
+          value={settings?.labelScale ?? LABEL_SCALE_DEFAULT}
+          onChange={labelScale => onSettingsChange({ labelScale })}
+        />
 
         <div className="panel-row mb-2">
           <span className="panel-row-label">Feature Markers</span>
