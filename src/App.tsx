@@ -56,10 +56,13 @@ import type { MarkerFormValues } from '@/components/MarkerForm';
 import HexListPanel from '@/components/HexListPanel';
 import Toolbar, { type StatsFilterType } from '@/components/Toolbar';
 import NewMapDialog from '@/components/NewMapDialog';
+import { useDialogs } from '@/components/DialogProvider';
 
 type SidebarView = 'hex' | 'multi-select' | 'settings' | 'factions' | 'markers' | 'none';
 
 function App() {
+  const { confirm, showError } = useDialogs();
+
   // Core state
   const [currentMap, setCurrentMap] = useState<CampaignMap | null>(null);
   const [selectedCoord, setSelectedCoord] = useState<HexCoord | null>(null);
@@ -445,9 +448,9 @@ function App() {
       setMultiSelectedCoords([]);
       setSidebarView('none');
     } catch (err) {
-      alert('Failed to save map: ' + (err as Error).message);
+      showError('Failed to save map: ' + (err as Error).message, "Couldn't save map");
     }
-  }, []);
+  }, [showError]);
   
   const handleOpenMap = useCallback(() => {
     setShowMapList(true);
@@ -458,10 +461,10 @@ function App() {
       try {
         await exportMap(currentMap);
       } catch (err) {
-        alert('Failed to export map: ' + (err as Error).message);
+        showError('Failed to export map: ' + (err as Error).message, "Couldn't export map");
       }
     }
-  }, [currentMap]);
+  }, [currentMap, showError]);
 
   const handleExportMapAsImage = useCallback(() => {
     if (!currentMap) return;
@@ -473,7 +476,7 @@ function App() {
 
     const svg = hexMapRef.current.getSvgElement();
     if (!svg) {
-      alert('Unable to export: map not ready');
+      showError('Unable to export: map not ready', "Couldn't export image");
       return;
     }
 
@@ -484,9 +487,9 @@ function App() {
       });
       setShowExportDialog(false);
     } catch (err) {
-      alert('Failed to export image: ' + (err as Error).message);
+      showError('Failed to export image: ' + (err as Error).message, "Couldn't export image");
     }
-  }, [currentMap]);
+  }, [currentMap, showError]);
   
   const handleImportMap = useCallback(() => {
     const input = document.createElement('input');
@@ -504,11 +507,11 @@ function App() {
         setMultiSelectedCoords([]);
         setSidebarView('none');
       } catch (err) {
-        alert('Failed to import map: ' + (err as Error).message);
+        showError('Failed to import map: ' + (err as Error).message, "Couldn't import map");
       }
     };
     input.click();
-  }, []);
+  }, [showError]);
   
   const handleOpenSettings = useCallback(() => {
     setSidebarView('settings');
@@ -929,7 +932,13 @@ function App() {
                         title="Delete map"
                         onClick={async (e) => {
                           e.stopPropagation();
-                          if (confirm(`Delete "${ref.name}"? This cannot be undone.`)) {
+                          const ok = await confirm({
+                            title: 'Delete map',
+                            message: `Delete "${ref.name}"? This cannot be undone.`,
+                            confirmLabel: 'Delete',
+                            danger: true,
+                          });
+                          if (ok) {
                             await deleteMap(ref.id);
                             // If we deleted the current map, clear it
                             if (currentMap?.id === ref.id) {

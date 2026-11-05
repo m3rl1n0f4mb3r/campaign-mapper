@@ -3,6 +3,7 @@ import type { Faction, FactionRelationshipStatus, FactionType, Hex, HexCoord, Gr
 import { DEFAULT_TERRAIN_TYPES, getEffectiveTerrain } from '@/lib/types';
 import { generateFactionNameOptions } from '@/lib/generator/nameGenerator';
 import { axialToOffset, getHexAt } from '@/lib/hexUtils';
+import { useDialogs } from './DialogProvider';
 
 function getTerrainInfo(terrainId: string, customTerrains: TerrainType[]): TerrainType {
   const allTerrains = [...DEFAULT_TERRAIN_TYPES, ...customTerrains];
@@ -86,6 +87,7 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
   onHexClick,
   onClose,
 }) => {
+  const { confirm } = useDialogs();
   const [selectedFactionId, setSelectedFactionId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [generatedNames, setGeneratedNames] = useState<string[]>([]);
@@ -200,14 +202,20 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
     setIsAddingNote(false);
   }, [selectedFaction, newNoteKey, handleUpdateFaction]);
   
-  const handleDeleteFaction = useCallback(() => {
+  const handleDeleteFaction = useCallback(async () => {
     if (!selectedFaction) return;
     const typeLabel = selectedFaction.type === 'region' ? 'region' : 'faction';
-    if (confirm(`Delete ${typeLabel} "${selectedFaction.name}"? This cannot be undone.`)) {
+    const ok = await confirm({
+      title: `Delete ${typeLabel}`,
+      message: `Delete ${typeLabel} "${selectedFaction.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (ok) {
       onDeleteFaction(selectedFaction.id);
       setSelectedFactionId(null);
     }
-  }, [selectedFaction, onDeleteFaction]);
+  }, [confirm, selectedFaction, onDeleteFaction]);
   
   const handleRelationshipChange = useCallback((
     targetFactionId: string, 
@@ -498,7 +506,7 @@ const FactionPanel: React.FC<FactionPanelProps> = ({
                             key={`${coord.q},${coord.r}`}
                             className="territory-hex-btn"
                             onClick={() => onHexClick(coord)}
-                            title={`${displayCoord} - ${terrain.name}`}
+                            aria-label={`${displayCoord}, ${terrain.name}`}
                           >
                             <span
                               className="territory-terrain-dot"

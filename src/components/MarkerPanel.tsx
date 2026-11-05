@@ -5,6 +5,7 @@ import { MarkerSwatch } from './MarkerChip';
 import MarkerForm, { type MarkerFormValues } from './MarkerForm';
 import { describeMarkerLocation } from './MarkerStrip';
 import { getTrailMoveCount } from '@/lib/mapFactory';
+import { useDialogs } from './DialogProvider';
 
 interface MarkerPanelProps {
   markers: Marker[];
@@ -44,20 +45,29 @@ const MarkerPanel: React.FC<MarkerPanelProps> = ({
   // 'new', a marker id being edited, or null
   const [formFor, setFormFor] = useState<string | null>(null);
 
+  const { confirm } = useDialogs();
   const hexKeys = useMemo(() => new Set(hexes.map(h => coordToKey(h.coord))), [hexes]);
 
-  const handleDelete = (marker: Marker) => {
+  const handleDelete = async (marker: Marker) => {
     const steps = getTrailMoveCount(marker.trail);
     const trailNote = steps > 0 ? ` and its trail (${steps} ${steps === 1 ? 'step' : 'steps'})` : '';
-    if (confirm(`Delete marker "${marker.name}"${trailNote}? This cannot be undone.`)) {
-      onDelete(marker.id);
-    }
+    const ok = await confirm({
+      title: 'Delete marker',
+      message: `Delete marker "${marker.name}"${trailNote}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (ok) onDelete(marker.id);
   };
 
-  const handleClearTrail = (marker: Marker) => {
-    if (confirm(`Clear the trail for "${marker.name}"? Explored hexes stay explored.`)) {
-      onClearTrail(marker.id);
-    }
+  const handleClearTrail = async (marker: Marker) => {
+    const ok = await confirm({
+      title: 'Clear trail',
+      message: `Clear the trail for "${marker.name}"? Explored hexes stay explored.`,
+      confirmLabel: 'Clear',
+      danger: true,
+    });
+    if (ok) onClearTrail(marker.id);
   };
 
   return (
