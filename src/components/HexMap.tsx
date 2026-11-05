@@ -10,6 +10,7 @@ import {
   getNeighbors,
   axialToOffset,
 } from '@/lib/hexUtils';
+import { BASE_DECORATION_SIZES as SIZES, getHexScale } from '@/lib/hexDecorations';
 
 interface HexMapProps {
   hexes: Hex[];
@@ -96,6 +97,8 @@ interface HexCellProps {
   showExploredStatus: boolean;
   fillOpacity: number;
   gridOpacity: number;
+  /** Decoration size multiplier from getHexScale() */
+  scale: number;
   onClick: (event: React.MouseEvent) => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -119,6 +122,7 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
   showExploredStatus,
   fillOpacity,
   gridOpacity,
+  scale,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -183,7 +187,7 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
         data-grid-opacity={gridOpacity}
         style={factionColor && !isSelected && !isMultiSelected ? {
           stroke: factionColor,
-          strokeWidth: 3,
+          strokeWidth: SIZES.factionBorder * scale,
         } : showGrid ? {
           strokeOpacity: gridOpacity,
         } : {
@@ -193,7 +197,7 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
       
       {/* Terrain symbol */}
       {showTerrainColors && terrain.symbol && (!showExploredStatus || isExplored) && (
-        <text className="hex-symbol" x={0} y={0}>
+        <text className="hex-symbol" x={0} y={0} fontSize={SIZES.symbolFont * scale}>
           {terrain.symbol}
         </text>
       )}
@@ -204,14 +208,14 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
           <circle
             cx={featureOffset.cx}
             cy={featureOffset.cy}
-            r={8}
+            r={SIZES.featureRadius * scale}
             fill={FEATURE_COLORS[hex.featureType] || '#888'}
           />
           <text
             x={featureOffset.cx}
             y={featureOffset.cy}
             fill="#000"
-            fontSize="9"
+            fontSize={SIZES.featureFont * scale}
             fontWeight="bold"
             textAnchor="middle"
             dominantBaseline="central"
@@ -227,7 +231,7 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
           className="hex-explored-dot"
           cx={gridConfig.hexSize * 0.5}
           cy={gridConfig.orientation === 'pointy-top' ? hexHeight * 0.2 : gridConfig.hexSize * 0.5}
-          r={4}
+          r={SIZES.exploredRadius * scale}
         />
       )}
 
@@ -237,14 +241,14 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
           <circle
             cx={gridConfig.orientation === 'pointy-top' ? gridConfig.hexSize * 0.55 : gridConfig.hexSize * 0.5}
             cy={gridConfig.orientation === 'pointy-top' ? -hexHeight * 0.15 : gridConfig.hexSize * 0.5}
-            r={7}
+            r={SIZES.linkRadius * scale}
             fill="#4a90d9"
           />
           <text
             x={gridConfig.orientation === 'pointy-top' ? gridConfig.hexSize * 0.55 : gridConfig.hexSize * 0.5}
             y={gridConfig.orientation === 'pointy-top' ? -hexHeight * 0.15 : gridConfig.hexSize * 0.5}
             fill="#fff"
-            fontSize="8"
+            fontSize={SIZES.linkFont * scale}
             textAnchor="middle"
             dominantBaseline="central"
           >
@@ -259,6 +263,7 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
           className="hex-coord"
           x={coordOffset.x}
           y={coordOffset.y}
+          fontSize={SIZES.coordFont * scale}
         >
           {displayCoord}
         </text>
@@ -353,6 +358,11 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
     return new Set(multiSelectedCoords.map(c => coordToKey(c)));
   }, [multiSelectedCoords]);
   
+  const hexScale = useMemo(
+    () => getHexScale(gridConfig, settings),
+    [gridConfig, settings]
+  );
+
   const neighborSet = useMemo(() => {
     return new Set(highlightedNeighbors.map(c => coordToKey(c)));
   }, [highlightedNeighbors]);
@@ -552,7 +562,10 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
         ref={svgRef}
         className="hex-overlay"
         viewBox={viewBox}
+        data-hex-scale={hexScale}
         style={{
+          // Read by highlight stroke widths in index.css
+          ['--hex-scale' as string]: hexScale,
           width: containerStyle?.width || '100%',
           height: containerStyle?.height || '100%',
           position: imageOverlay?.visible ? 'absolute' : 'relative',
@@ -596,6 +609,7 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
                 showExploredStatus={settings?.showExploredStatus ?? false}
                 fillOpacity={settings?.hexFillOpacity ?? 0.5}
                 gridOpacity={settings?.gridOpacity ?? 0.3}
+                scale={hexScale}
                 onClick={(e) => handleHexClick(hex, e)}
                 onMouseEnter={() => handleMouseEnter(hex)}
                 onMouseLeave={handleMouseLeave}
