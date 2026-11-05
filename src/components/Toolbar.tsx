@@ -207,7 +207,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
               onClick={() => onStatsClick('all')}
               title="Total hexes - click to view all"
             >
-              ⬢ {stats.hexes}
+              <span className="toolbar-stat-value">⬢ {stats.hexes}</span>
+              <span className="toolbar-stat-caption">Hexes</span>
             </button>
             <button 
               className="toolbar-stat-btn"
@@ -215,7 +216,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
               title="Hexes with features - click to view"
               style={{ color: 'var(--primary)' }}
             >
-              ⬡ {stats.withFeatures}
+              <span className="toolbar-stat-value">⬡ {stats.withFeatures}</span>
+              <span className="toolbar-stat-caption">Features</span>
             </button>
             <button 
               className="toolbar-stat-btn"
@@ -223,7 +225,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
               title="Hexes with campaign data - click to view"
               style={{ color: 'var(--data-indicator)' }}
             >
-              ✎ {stats.withData}
+              <span className="toolbar-stat-value">✎ {stats.withData}</span>
+              <span className="toolbar-stat-caption">With data</span>
             </button>
             <button
               className="toolbar-stat-btn"
@@ -231,7 +234,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
               title="Explored hexes - click to view"
               style={{ color: 'var(--success)' }}
             >
-              ✓ {stats.explored}
+              <span className="toolbar-stat-value">✓ {stats.explored}</span>
+              <span className="toolbar-stat-caption">Explored</span>
             </button>
             <button
               className="toolbar-stat-btn"
@@ -239,28 +243,32 @@ const Toolbar: React.FC<ToolbarProps> = ({
               title="Hexes with tags - click to filter by tag"
               style={{ color: 'var(--warning, #f59e0b)' }}
             >
-              🏷 {stats.withTags}
+              <span className="toolbar-stat-value">🏷 {stats.withTags}</span>
+              <span className="toolbar-stat-caption">Tagged</span>
             </button>
             <button
               className="toolbar-stat-btn"
               onClick={() => onStatsClick('factions')}
               title="Factions - click to manage"
             >
-              👥 {stats.factions}
+              <span className="toolbar-stat-value">👥 {stats.factions}</span>
+              <span className="toolbar-stat-caption">Factions</span>
             </button>
             <button
               className="toolbar-stat-btn"
               onClick={() => onStatsClick('factions')}
               title="Regions - click to manage"
             >
-              🗺 {stats.regions}
+              <span className="toolbar-stat-value">🗺 {stats.regions}</span>
+              <span className="toolbar-stat-caption">Regions</span>
             </button>
             <button
               className="toolbar-stat-btn"
               onClick={onOpenMarkers}
               title="Markers - click to manage"
             >
-              📍 {stats.markers}
+              <span className="toolbar-stat-value">📍 {stats.markers}</span>
+              <span className="toolbar-stat-caption">Markers</span>
             </button>
           </div>
         )}

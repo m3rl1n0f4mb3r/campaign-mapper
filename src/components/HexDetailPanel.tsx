@@ -13,6 +13,15 @@ import { generateRegion, generate19HexRegion, generateFeaturesOnly } from '@/lib
 import MarkerStrip from './MarkerStrip';
 import type { MarkerFormValues } from './MarkerForm';
 
+/** Where a link goes, shown under its label (e.g. "worldanvil.com") */
+function getLinkDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
 // Accordion component for collapsible sections
 interface AccordionProps {
   title: string;
@@ -1730,6 +1739,7 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
                         title={url}
                       >
                         🔗 {label}
+                        <span className="hex-link-domain">{getLinkDomain(url)}</span>
                       </a>
                     </div>
                   ))

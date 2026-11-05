@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import type { CampaignSettings, GridConfig, TerrainType, ImageOverlay } from '@/lib/types';
 import { DEFAULT_TERRAIN_TYPES } from '@/lib/types';
 import { getHexSpacing, getHexDimensions } from '@/lib/hexUtils';
+import { useDialogs } from './DialogProvider';
 import {
   clampLabelScale,
   LABEL_SCALE_DEFAULT,
@@ -203,8 +204,11 @@ const TerrainTypesSection: React.FC<TerrainTypesSectionProps> = ({
   customTerrainTypes,
   onUpdate,
 }) => {
+  const { confirm } = useDialogs();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Shown under the name field (e.g. duplicate name)
+  const [nameError, setNameError] = useState<string | null>(null);
   const [newTerrain, setNewTerrain] = useState<TerrainType>({
     id: '',
     name: '',
@@ -221,7 +225,7 @@ const TerrainTypesSection: React.FC<TerrainTypesSectionProps> = ({
     // Check for duplicate id
     const allIds = [...DEFAULT_TERRAIN_TYPES, ...customTerrainTypes].map(t => t.id);
     if (allIds.includes(id)) {
-      alert('A terrain type with this name already exists.');
+      setNameError('A terrain type with this name already exists.');
       return;
     }
     
@@ -243,11 +247,17 @@ const TerrainTypesSection: React.FC<TerrainTypesSectionProps> = ({
     ));
   }, [customTerrainTypes, onUpdate]);
 
-  const handleDeleteTerrain = useCallback((id: string) => {
-    if (confirm('Delete this terrain type? Hexes using it will show as "unknown".')) {
+  const handleDeleteTerrain = useCallback(async (id: string) => {
+    const ok = await confirm({
+      title: 'Delete terrain type',
+      message: 'Delete this terrain type? Hexes using it will show as "unknown".',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (ok) {
       onUpdate(customTerrainTypes.filter(t => t.id !== id));
     }
-  }, [customTerrainTypes, onUpdate]);
+  }, [confirm, customTerrainTypes, onUpdate]);
 
   return (
     <Accordion title={`Terrain Types (${DEFAULT_TERRAIN_TYPES.length} + ${customTerrainTypes.length} custom)`} defaultOpen={false}>
@@ -358,13 +368,19 @@ const TerrainTypesSection: React.FC<TerrainTypesSectionProps> = ({
               type="text"
               className="form-input terrain-name-input"
               value={newTerrain.name}
-              onChange={e => setNewTerrain(prev => ({ ...prev, name: e.target.value }))}
+              onChange={e => {
+                setNewTerrain(prev => ({ ...prev, name: e.target.value }));
+                setNameError(null);
+              }}
               placeholder="Terrain name"
+              aria-invalid={!!nameError}
+              aria-describedby={nameError ? 'terrain-name-error' : undefined}
               autoFocus
               onKeyDown={e => {
                 if (e.key === 'Enter') handleAddTerrain();
                 if (e.key === 'Escape') {
                   setIsAdding(false);
+                  setNameError(null);
                   setNewTerrain({ id: '', name: '', color: '#808080', symbol: '' });
                 }
               }}
@@ -378,6 +394,9 @@ const TerrainTypesSection: React.FC<TerrainTypesSectionProps> = ({
               maxLength={2}
             />
           </div>
+          {nameError && (
+            <div className="form-error" id="terrain-name-error" role="alert">{nameError}</div>
+          )}
           <div className="flex gap-2 mt-2">
             <button
               className="btn btn-primary btn-sm flex-1"
@@ -390,6 +409,7 @@ const TerrainTypesSection: React.FC<TerrainTypesSectionProps> = ({
               className="btn btn-secondary btn-sm"
               onClick={() => {
                 setIsAdding(false);
+                setNameError(null);
                 setNewTerrain({ id: '', name: '', color: '#808080', symbol: '' });
               }}
             >
