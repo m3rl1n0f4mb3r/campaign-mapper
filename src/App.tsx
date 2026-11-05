@@ -24,6 +24,12 @@ import {
   bulkUpdateTerrain,
   bulkAddTags,
   updateGridConfig,
+  addMarker,
+  updateMarker,
+  moveMarker,
+  reorderMarker,
+  deleteMarker,
+  createMarkerId,
 } from '@/lib/mapFactory';
 import { 
   saveMap, 
@@ -42,11 +48,13 @@ import HexDetailPanel from '@/components/HexDetailPanel';
 import MultiSelectPanel from '@/components/MultiSelectPanel';
 import SettingsPanel from '@/components/SettingsPanel';
 import FactionPanel from '@/components/FactionPanel';
+import MarkerPanel from '@/components/MarkerPanel';
+import type { MarkerFormValues } from '@/components/MarkerForm';
 import HexListPanel from '@/components/HexListPanel';
 import Toolbar, { type StatsFilterType } from '@/components/Toolbar';
 import NewMapDialog from '@/components/NewMapDialog';
 
-type SidebarView = 'hex' | 'multi-select' | 'settings' | 'factions' | 'none';
+type SidebarView = 'hex' | 'multi-select' | 'settings' | 'factions' | 'markers' | 'none';
 
 function App() {
   // Core state
@@ -240,6 +248,46 @@ function App() {
       updatedAt: new Date().toISOString(),
     });
   }, [currentMap, multiSelectedCoords]);
+
+  // Markers
+  const handleCreateMarker = useCallback((values: MarkerFormValues, coord: HexCoord | null) => {
+    setCurrentMap(map => map && addMarker(map, { id: createMarkerId(), ...values, coord }));
+  }, []);
+
+  const handleAddStarterMarkers = useCallback(() => {
+    setCurrentMap(map => {
+      if (!map) return map;
+      const withParty = addMarker(map, {
+        id: createMarkerId(), name: 'Party', icon: 'users', color: '#e6194b', coord: null,
+      });
+      return addMarker(withParty, {
+        id: createMarkerId(), name: 'Destination', icon: 'flag', color: '#4363d8', coord: null,
+      });
+    });
+  }, []);
+
+  const handleUpdateMarker = useCallback((id: string, values: MarkerFormValues) => {
+    setCurrentMap(map => map && updateMarker(map, id, values));
+  }, []);
+
+  const handleMoveMarker = useCallback((id: string, coord: HexCoord | null) => {
+    setCurrentMap(map => map && moveMarker(map, id, coord));
+  }, []);
+
+  const handleReorderMarker = useCallback((id: string, direction: 'up' | 'down') => {
+    setCurrentMap(map => map && reorderMarker(map, id, direction));
+  }, []);
+
+  const handleDeleteMarker = useCallback((id: string) => {
+    setCurrentMap(map => map && deleteMarker(map, id));
+  }, []);
+
+  const handleOpenMarkers = useCallback(() => {
+    setSidebarView('markers');
+    setSelectedCoord(null);
+    setMultiSelectedCoords([]);
+    setHexListFilter(null);
+  }, []);
 
   // Settings
   const handleSettingsChange = useCallback((updates: Partial<CampaignSettings>) => {
@@ -645,6 +693,7 @@ function App() {
           onOpenSettings={handleOpenSettings}
           onMapNameChange={handleMapNameChange}
           onStatsClick={handleStatsClick}
+          onOpenMarkers={handleOpenMarkers}
           selectedCount={multiSelectedCoords.length}
           onClearSelection={handleClearSelection}
           zoom={zoom}
@@ -664,6 +713,7 @@ function App() {
                 multiSelectedCoords={multiSelectedCoords}
                 highlightedNeighbors={highlightedNeighbors}
                 factions={currentMap.factions}
+                markers={currentMap.markers}
                 zoom={zoom}
                 onHexClick={handleHexClick}
                 onBoxSelect={handleBoxSelect}
@@ -722,6 +772,8 @@ function App() {
                 onBulkHexUpdateWithFactions={handleBulkHexUpdateWithFactions}
                 onAddFaction={handleAddFaction}
                 onUpdateFaction={handleUpdateFaction}
+                onMoveMarker={handleMoveMarker}
+                onCreateMarker={values => handleCreateMarker(values, selectedHex.coord)}
                 onClose={handleCloseSidebar}
               />
             )}
@@ -767,6 +819,22 @@ function App() {
                   setMultiSelectedCoords([]);
                   setSidebarView('hex');
                 }}
+                onClose={handleCloseSidebar}
+              />
+            )}
+
+            {sidebarView === 'markers' && (
+              <MarkerPanel
+                markers={currentMap.markers}
+                hexes={currentMap.hexes}
+                gridConfig={currentMap.gridConfig}
+                onAdd={values => handleCreateMarker(values, null)}
+                onAddStarters={handleAddStarterMarkers}
+                onUpdate={handleUpdateMarker}
+                onMove={handleMoveMarker}
+                onReorder={handleReorderMarker}
+                onDelete={handleDeleteMarker}
+                onGoTo={handleHexListClick}
                 onClose={handleCloseSidebar}
               />
             )}

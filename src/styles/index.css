@@ -1465,3 +1465,267 @@ body {
   font-size: 0.75rem;
   color: var(--success);
 }
+
+/* ============================================
+   MARKERS
+   ============================================ */
+
+/* Hex panel strip: always one line (chips that don't fit go in the ▾ list) */
+.marker-strip {
+  position: relative;
+  margin-bottom: var(--spacing-sm);
+}
+
+.marker-strip-row {
+  display: flex;
+  align-items: center;
+  gap: 4px; /* Keep in sync with CHIP_GAP in MarkerStrip.tsx */
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-height: 40px;
+  padding: var(--spacing-xs) 0;
+}
+
+.marker-strip-label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-right: 2px;
+}
+
+.marker-strip-more,
+.marker-strip-add {
+  flex: 0 0 auto;
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+.marker-strip-add {
+  margin-left: auto;
+}
+
+/* Hidden copies used to measure chip widths */
+.marker-strip-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+  display: flex;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.marker-strip-measure > span {
+  display: inline-flex;
+}
+
+.marker-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 2px solid;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: filter var(--transition-fast);
+}
+
+.marker-chip:hover {
+  filter: brightness(1.15);
+}
+
+.marker-chip.outlined {
+  background: var(--bg-primary);
+}
+
+.marker-chip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* All-markers popover */
+.marker-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.marker-popover-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.marker-popover-row,
+.marker-list-main {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 36px;
+}
+
+.marker-popover-empty {
+  padding: var(--spacing-sm);
+}
+
+.marker-swatch {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+}
+
+.marker-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.marker-row-location {
+  flex: 0 0 auto;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.marker-popover-row .btn,
+.marker-list-actions .btn {
+  min-height: 32px;
+  min-width: 32px;
+}
+
+/* Marker form */
+.marker-form {
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.marker-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 4px;
+}
+
+.marker-icon-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* 15 presets + custom = two rows of 8 */
+.marker-color-row {
+  display: grid;
+  grid-template-columns: repeat(8, 32px);
+  justify-content: space-between;
+  row-gap: 8px;
+}
+
+.marker-color-option {
+  width: 32px;
+  height: 32px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.marker-color-option.selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px #fff;
+}
+
+.marker-color-custom {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: conic-gradient(#e6194b, #ffe119, #3cb44b, #42d4f4, #4363d8, #f032e6, #e6194b);
+}
+
+/* Invisible native picker covering the circle */
+.marker-color-custom input[type=color] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.marker-form-warning {
+  margin-bottom: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-left: 3px solid var(--warning);
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.marker-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+}
+
+.marker-form-actions .btn {
+  min-height: 32px;
+}
+
+/* Markers panel */
+.marker-panel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.marker-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.marker-list-row {
+  padding: var(--spacing-sm);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.marker-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: var(--spacing-xs);
+}
