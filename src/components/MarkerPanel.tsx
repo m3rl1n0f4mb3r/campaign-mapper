@@ -4,6 +4,7 @@ import { coordToKey } from '@/lib/types';
 import { MarkerSwatch } from './MarkerChip';
 import MarkerForm, { type MarkerFormValues } from './MarkerForm';
 import { describeMarkerLocation } from './MarkerStrip';
+import { getTrailMoveCount } from '@/lib/mapFactory';
 
 interface MarkerPanelProps {
   markers: Marker[];
@@ -16,6 +17,9 @@ interface MarkerPanelProps {
   onMove: (id: string, coord: HexCoord | null) => void;
   onReorder: (id: string, direction: 'up' | 'down') => void;
   onDelete: (id: string) => void;
+  onSetTrailVisible: (id: string, visible: boolean) => void;
+  onUndoTrailStep: (id: string) => void;
+  onClearTrail: (id: string) => void;
   onGoTo: (coord: HexCoord) => void;
   onClose: () => void;
 }
@@ -31,6 +35,9 @@ const MarkerPanel: React.FC<MarkerPanelProps> = ({
   onMove,
   onReorder,
   onDelete,
+  onSetTrailVisible,
+  onUndoTrailStep,
+  onClearTrail,
   onGoTo,
   onClose,
 }) => {
@@ -40,8 +47,16 @@ const MarkerPanel: React.FC<MarkerPanelProps> = ({
   const hexKeys = useMemo(() => new Set(hexes.map(h => coordToKey(h.coord))), [hexes]);
 
   const handleDelete = (marker: Marker) => {
-    if (confirm(`Delete marker "${marker.name}"? This cannot be undone.`)) {
+    const steps = getTrailMoveCount(marker.trail);
+    const trailNote = steps > 0 ? ` and its trail (${steps} ${steps === 1 ? 'step' : 'steps'})` : '';
+    if (confirm(`Delete marker "${marker.name}"${trailNote}? This cannot be undone.`)) {
       onDelete(marker.id);
+    }
+  };
+
+  const handleClearTrail = (marker: Marker) => {
+    if (confirm(`Clear the trail for "${marker.name}"? Explored hexes stay explored.`)) {
+      onClearTrail(marker.id);
     }
   };
 
@@ -97,12 +112,22 @@ const MarkerPanel: React.FC<MarkerPanelProps> = ({
                     setFormFor(null);
                   }}
                   onCancel={() => setFormFor(null)}
+                  onUndoTrailStep={() => onUndoTrailStep(marker.id)}
+                  onClearTrail={() => handleClearTrail(marker)}
                 />
               );
             }
 
             const location = describeMarkerLocation(marker, hexKeys, gridConfig);
             const onGrid = !!marker.coord && hexKeys.has(coordToKey(marker.coord));
+            const trail = marker.trail;
+            const stepCount = getTrailMoveCount(trail);
+            const showTrailLine = !!trail && (trail.record || trail.steps.length > 0);
+            const trailStatus = trail && [
+              `${stepCount} ${stepCount === 1 ? 'step' : 'steps'}`,
+              trail.record ? 'recording' : 'paused',
+              ...(trail.visible ? [] : ['hidden']),
+            ].join(' · ');
 
             return (
               <div key={marker.id} className="marker-list-row">
@@ -157,6 +182,24 @@ const MarkerPanel: React.FC<MarkerPanelProps> = ({
                     🗑
                   </button>
                 </div>
+                {showTrailLine && trail && (
+                  <div className="marker-list-trail">
+                    <span className="marker-list-trail-status">Trail · {trailStatus}</span>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => onSetTrailVisible(marker.id, !trail.visible)}
+                    >
+                      {trail.visible ? 'Hide trail' : 'Show trail'}
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => onUndoTrailStep(marker.id)}
+                      disabled={stepCount === 0}
+                    >
+                      ↶ Undo step
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}

@@ -6,6 +6,7 @@ import type {
   ImageOverlay,
   MapMode,
   Marker,
+  MarkerTrail,
 } from './types';
 import { 
   DEFAULT_GRID_CONFIG, 
@@ -356,21 +357,124 @@ export function reorderMarker(map: CampaignMap, id: string, direction: 'up' | 'd
   return withMarkers(map, markers);
 }
 
+function sameCoord(a: HexCoord | null | undefined, b: HexCoord | null | undefined): boolean {
+  return !!a && !!b && a.q === b.q && a.r === b.r;
+}
+
+function replaceMarker(map: CampaignMap, marker: Marker): CampaignMap {
+  return withMarkers(map, map.markers.map(m => (m.id === marker.id ? marker : m)));
+}
+
 /**
  * Place a marker on a hex, or take it off the map (coord = null).
- * All marker placement goes through here.
+ * All marker placement goes through here, so this is also where a recording
+ * marker's trail grows.
  */
 export function moveMarker(map: CampaignMap, id: string, coord: HexCoord | null): CampaignMap {
   const marker = map.markers.find(m => m.id === id);
   if (!marker) return map;
 
-  const current = marker.coord;
-  const unchanged = coord === null
-    ? current === null
-    : current !== null && current.q === coord.q && current.r === coord.r;
+  const unchanged = coord === null ? marker.coord === null : sameCoord(marker.coord, coord);
   if (unchanged) return map;
 
-  return withMarkers(map, map.markers.map(m => (m.id === id ? { ...m, coord } : m)));
+  const trail = marker.trail;
+  if (!trail?.record || coord === null) {
+    // Taking a marker off the map keeps its trail as is
+    return replaceMarker(map, { ...marker, coord });
+  }
+
+  const steps = [...trail.steps];
+  // Turning recording on and then moving draws from where the marker was
+  if (steps.length === 0 && marker.coord) {
+    steps.push({ coord: marker.coord });
+  }
+
+  let result = map;
+  // Re-placing a removed marker where its trail ended adds no step
+  if (!sameCoord(steps[steps.length - 1]?.coord, coord)) {
+    const hex = map.hexes.find(h => sameCoord(h.coord, coord));
+    const wasExplored = !!hex?.campaignData?.explored;
+    const step: MarkerTrail['steps'][number] = { coord };
+
+    if (trail.markExplored && hex) {
+      result = updateHexCampaignData(result, coord, {
+        explored: true,
+        lastVisited: new Date().toISOString(),
+      });
+      if (!wasExplored) step.setExplored = true;
+    }
+    steps.push(step);
+  }
+
+  return replaceMarker(result, { ...marker, coord, trail: { ...trail, steps } });
+}
+
+/**
+ * Remove a marker's newest trail step. If the marker is still on that step it
+ * moves back to the previous one. Un-explores the hex if that step explored it.
+ */
+export function undoTrailStep(map: CampaignMap, id: string): CampaignMap {
+  const marker = map.markers.find(m => m.id === id);
+  const trail = marker?.trail;
+  if (!marker || !trail || trail.steps.length === 0) return map;
+
+  const steps = trail.steps.slice(0, -1);
+  const undone = trail.steps[trail.steps.length - 1];
+  const previous = steps[steps.length - 1];
+
+  let result = map;
+  if (undone.setExplored) {
+    result = updateHexCampaignData(result, undone.coord, {
+      explored: false,
+      lastVisited: undefined,
+    });
+  }
+
+  // Only step back if the marker hasn't moved on (or off the map) since
+  const coord = previous && sameCoord(marker.coord, undone.coord) ? previous.coord : marker.coord;
+  return replaceMarker(result, { ...marker, coord, trail: { ...trail, steps } });
+}
+
+/**
+ * Empty the trail. Explored flags are kept. The next recorded move starts the
+ * line from wherever the marker is then.
+ */
+export function clearTrail(map: CampaignMap, id: string): CampaignMap {
+  const marker = map.markers.find(m => m.id === id);
+  if (!marker?.trail) return map;
+
+  return replaceMarker(map, { ...marker, trail: { ...marker.trail, steps: [] } });
+}
+
+/** Moves recorded on a trail: the first step is only where it started */
+export function getTrailMoveCount(trail: MarkerTrail | undefined): number {
+  return Math.max(0, (trail?.steps.length ?? 0) - 1);
+}
+
+export type TrailOptions = Pick<MarkerTrail, 'record' | 'visible' | 'markExplored'>;
+
+export const DEFAULT_TRAIL_OPTIONS: TrailOptions = {
+  record: false,
+  visible: true,
+  markExplored: false,
+};
+
+/** Change a marker's trail switches, setting up the trail if needed. Steps are kept. */
+export function setTrailOptions(
+  map: CampaignMap,
+  id: string,
+  options: Partial<TrailOptions>
+): CampaignMap {
+  const marker = map.markers.find(m => m.id === id);
+  if (!marker) return map;
+
+  const trail: MarkerTrail = {
+    ...DEFAULT_TRAIL_OPTIONS,
+    steps: [],
+    ...marker.trail,
+    ...options,
+  };
+  return replaceMarker(map, { ...marker, trail });
 }
 
 export function deleteMarker(map: CampaignMap, id: string): CampaignMap {

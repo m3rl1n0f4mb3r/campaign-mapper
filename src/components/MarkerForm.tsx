@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import type { Marker } from '@/lib/types';
 import { MARKER_ICONS, MARKER_ICON_KEYS, findLookAlike, getDefaultLook } from '@/lib/markerIcons';
 import { MARKER_COLORS, getContrastText } from '@/lib/palette';
+import { DEFAULT_TRAIL_OPTIONS, getTrailMoveCount, type TrailOptions } from '@/lib/mapFactory';
 
 export interface MarkerFormValues {
   name: string;
   icon: string;
   color: string;
+  trail: TrailOptions;
 }
 
 interface MarkerFormProps {
@@ -16,14 +18,39 @@ interface MarkerFormProps {
   editing?: Marker;
   onSave: (values: MarkerFormValues) => void;
   onCancel: () => void;
+  /** Trail actions apply right away (edit mode only) */
+  onUndoTrailStep?: () => void;
+  onClearTrail?: () => void;
 }
 
 /** Inline form for creating or editing a marker's name, icon and color */
-const MarkerForm: React.FC<MarkerFormProps> = ({ markers, editing, onSave, onCancel }) => {
+const MarkerForm: React.FC<MarkerFormProps> = ({
+  markers,
+  editing,
+  onSave,
+  onCancel,
+  onUndoTrailStep,
+  onClearTrail,
+}) => {
   // Set once on open; later marker changes don't reset what's being typed
-  const [values, setValues] = useState<MarkerFormValues>(() => editing
-    ? { name: editing.name, icon: editing.icon, color: editing.color }
-    : { name: '', ...getDefaultLook(markers) });
+  const [values, setValues] = useState<MarkerFormValues>(() => {
+    const trail: TrailOptions = editing?.trail
+      ? {
+        record: editing.trail.record,
+        visible: editing.trail.visible,
+        markExplored: editing.trail.markExplored,
+      }
+      : { ...DEFAULT_TRAIL_OPTIONS };
+    return editing
+      ? { name: editing.name, icon: editing.icon, color: editing.color, trail }
+      : { name: '', ...getDefaultLook(markers), trail };
+  });
+
+  const setTrail = (changes: Partial<TrailOptions>) =>
+    setValues(v => ({ ...v, trail: { ...v.trail, ...changes } }));
+
+  // Live step count from the saved marker (undo/clear apply immediately)
+  const stepCount = getTrailMoveCount(editing?.trail);
 
   const isCustomColor = !MARKER_COLORS.some(c => c.toLowerCase() === values.color.toLowerCase());
   const lookAlike = findLookAlike(markers, values.icon, values.color, editing?.id);
@@ -107,6 +134,48 @@ const MarkerForm: React.FC<MarkerFormProps> = ({ markers, editing, onSave, onCan
             />
           </label>
         </div>
+      </div>
+
+      <div className="form-group">
+        <span className="form-label">Trail</span>
+        <label className="marker-form-check">
+          <input
+            type="checkbox"
+            checked={values.trail.record}
+            onChange={e => setTrail({ record: e.target.checked })}
+          />
+          Record trail
+        </label>
+        <label className="marker-form-check">
+          <input
+            type="checkbox"
+            checked={values.trail.visible}
+            onChange={e => setTrail({ visible: e.target.checked })}
+          />
+          Show trail on map
+        </label>
+        <label className={`marker-form-check ${values.trail.record ? '' : 'disabled'}`}>
+          <input
+            type="checkbox"
+            checked={values.trail.markExplored}
+            disabled={!values.trail.record}
+            onChange={e => setTrail({ markExplored: e.target.checked })}
+          />
+          Mark hexes explored when moved here
+        </label>
+        {editing && stepCount > 0 && (
+          <div className="marker-form-trail-steps">
+            <span className="text-sm text-muted">
+              {stepCount} {stepCount === 1 ? 'step' : 'steps'}
+            </span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={onUndoTrailStep}>
+              ↶ Undo step
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={onClearTrail}>
+              Clear trail
+            </button>
+          </div>
+        )}
       </div>
 
       {lookAlike && (

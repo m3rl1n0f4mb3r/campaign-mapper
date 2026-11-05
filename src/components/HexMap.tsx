@@ -88,10 +88,7 @@ interface HexCellProps {
   isNeighbor: boolean;
   showTerrainColors: boolean;
   showDataIndicator: boolean;
-  showCoordinates: boolean;
   showGrid: boolean;
-  showLinkIndicators: boolean;
-  hasLinks: boolean;
   factionColor?: string;
   isExplored: boolean;
   showExploredStatus: boolean;
@@ -99,15 +96,15 @@ interface HexCellProps {
   gridOpacity: number;
   /** Decoration size multiplier from getHexScale() */
   scale: number;
-  /** A marker is on this hex (marked on the group for image export) */
-  hasMarker: boolean;
-  /** Markers are drawn, so the terrain symbol under the badge is hidden */
-  showMarkers: boolean;
   onClick: (event: React.MouseEvent) => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
 }
 
+/**
+ * Bottom layer of a hex: fill, border and highlight. Handles clicks and hover.
+ * Labels and badges are drawn separately (HexDecorations) above the trails.
+ */
 const HexCell: React.FC<HexCellProps> = React.memo(({
   hex,
   gridConfig,
@@ -117,24 +114,18 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
   isNeighbor,
   showTerrainColors,
   showDataIndicator,
-  showCoordinates,
   showGrid,
-  showLinkIndicators,
-  hasLinks,
   factionColor,
   isExplored,
   showExploredStatus,
   fillOpacity,
   gridOpacity,
   scale,
-  hasMarker,
-  showMarkers,
   onClick,
   onMouseEnter,
   onMouseLeave,
 }) => {
   const { x, y } = hexToPixel(hex.coord, gridConfig);
-  const { height: hexHeight } = getHexDimensions(gridConfig);
   const hasData = hexHasUserData(hex);
   
   // Determine fill color and opacity
@@ -157,6 +148,79 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
     showExploredStatus && !isExplored && 'fog-hidden',
   ].filter(Boolean).join(' ');
   
+  return (
+    <g
+      className={classNames}
+      transform={`translate(${x}, ${y})`}
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      {/* Main hex polygon */}
+      <polygon
+        className="hex-polygon hex-terrain-fill"
+        points={getHexPoints(0, 0, gridConfig)}
+        fill={fillColor}
+        fillOpacity={opacity}
+        data-terrain-color={terrain.color}
+        data-grid-opacity={gridOpacity}
+        style={factionColor && !isSelected && !isMultiSelected ? {
+          stroke: factionColor,
+          strokeWidth: SIZES.factionBorder * scale,
+        } : showGrid ? {
+          strokeOpacity: gridOpacity,
+        } : {
+          stroke: 'none',
+        }}
+      />
+    </g>
+  );
+});
+
+HexCell.displayName = 'HexCell';
+
+interface HexDecorationsProps {
+  hex: Hex;
+  gridConfig: GridConfig;
+  terrain: TerrainType;
+  showTerrainColors: boolean;
+  showCoordinates: boolean;
+  showLinkIndicators: boolean;
+  hasLinks: boolean;
+  isExplored: boolean;
+  showExploredStatus: boolean;
+  showExploredIndicator: boolean;
+  scale: number;
+  /** A marker is on this hex (marked on the group for image export) */
+  hasMarker: boolean;
+  /** Markers are drawn, so the terrain symbol under the badge is hidden */
+  showMarkers: boolean;
+}
+
+/**
+ * Top layer of a hex: terrain symbol, feature and link badges, explored dot
+ * and coordinate label. Drawn above trails so lines never cover them.
+ * Always rendered (even when empty) so image export can add labels to it.
+ */
+const HexDecorations: React.FC<HexDecorationsProps> = React.memo(({
+  hex,
+  gridConfig,
+  terrain,
+  showTerrainColors,
+  showCoordinates,
+  showLinkIndicators,
+  hasLinks,
+  isExplored,
+  showExploredStatus,
+  showExploredIndicator,
+  scale,
+  hasMarker,
+  showMarkers,
+}) => {
+  const { x, y } = hexToPixel(hex.coord, gridConfig);
+  const { height: hexHeight } = getHexDimensions(gridConfig);
+  const visible = !showExploredStatus || isExplored;
+
   // Feature indicator position (top of hex for pointy-top, right for flat-top)
   const featureOffset = gridConfig.orientation === 'pointy-top'
     ? { cx: 0, cy: -hexHeight * 0.32 }
@@ -170,47 +234,26 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
   // Get display coordinate
   const { col, row } = axialToOffset(hex.coord, gridConfig);
   const displayCoord = `${String(col).padStart(2, '0')}${String(row).padStart(2, '0')}`;
-  
+
   return (
     <g
-      className={classNames}
+      className="hex-decorations"
       transform={`translate(${x}, ${y})`}
       data-coord={displayCoord}
       data-coord-x={coordOffset.x}
       data-coord-y={coordOffset.y}
+      data-terrain-symbol={terrain.symbol || ''}
       data-has-marker={hasMarker || undefined}
-      onClick={onClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
     >
-      {/* Main hex polygon */}
-      <polygon
-        className="hex-polygon hex-terrain-fill"
-        points={getHexPoints(0, 0, gridConfig)}
-        fill={fillColor}
-        fillOpacity={opacity}
-        data-terrain-color={terrain.color}
-        data-terrain-symbol={terrain.symbol || ''}
-        data-grid-opacity={gridOpacity}
-        style={factionColor && !isSelected && !isMultiSelected ? {
-          stroke: factionColor,
-          strokeWidth: SIZES.factionBorder * scale,
-        } : showGrid ? {
-          strokeOpacity: gridOpacity,
-        } : {
-          stroke: 'none',
-        }}
-      />
-      
       {/* Terrain symbol */}
-      {showTerrainColors && terrain.symbol && (!showExploredStatus || isExplored) && !(hasMarker && showMarkers) && (
+      {showTerrainColors && terrain.symbol && visible && !(hasMarker && showMarkers) && (
         <text className="hex-symbol" x={0} y={0} fontSize={SIZES.symbolFont * scale}>
           {terrain.symbol}
         </text>
       )}
       
       {/* Feature indicator */}
-      {hex.featureType && (!showExploredStatus || isExplored) && (
+      {hex.featureType && visible && (
         <g className="hex-feature-indicator">
           <circle
             cx={featureOffset.cx}
@@ -233,9 +276,11 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
       )}
       
       {/* Explored indicator */}
-      {hex.campaignData?.explored && !showExploredStatus && (
+      {/* Always rendered for explored hexes (hidden when off) so image export can include it */}
+      {hex.campaignData?.explored && (
         <circle
           className="hex-explored-dot"
+          display={!showExploredStatus && showExploredIndicator ? undefined : 'none'}
           cx={gridConfig.hexSize * 0.5}
           cy={gridConfig.orientation === 'pointy-top' ? hexHeight * 0.2 : gridConfig.hexSize * 0.5}
           r={SIZES.exploredRadius * scale}
@@ -243,7 +288,7 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
       )}
 
       {/* Link indicator */}
-      {showLinkIndicators && hasLinks && (!showExploredStatus || isExplored) && (
+      {showLinkIndicators && hasLinks && visible && (
         <g className="hex-link-indicator">
           <circle
             cx={gridConfig.orientation === 'pointy-top' ? gridConfig.hexSize * 0.55 : gridConfig.hexSize * 0.5}
@@ -265,7 +310,7 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
       )}
 
       {/* Coordinate label */}
-      {showCoordinates && (!showExploredStatus || isExplored) && (
+      {showCoordinates && visible && (
         <text
           className="hex-coord"
           x={coordOffset.x}
@@ -279,7 +324,7 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
   );
 });
 
-HexCell.displayName = 'HexCell';
+HexDecorations.displayName = 'HexDecorations';
 
 // ============================================
 // MARKERS
@@ -377,6 +422,117 @@ const MarkerCluster: React.FC<MarkerClusterProps> = React.memo(({ markers, gridC
 
 MarkerCluster.displayName = 'MarkerCluster';
 
+// ============================================
+// TRAILS
+// ============================================
+
+/** Base sizes at a 32px hex; multiplied by the hex scale */
+const TRAIL_WIDTH = 3;
+const TRAIL_HALO_WIDTH = 5;
+const TRAIL_START_RADIUS = 4;
+const TRAIL_CHEVRON_ARM = 4;
+
+interface MarkerTrailPathProps {
+  marker: Marker;
+  hexKeys: Set<string>;
+  gridConfig: GridConfig;
+  scale: number;
+}
+
+/** One marker's trail: line through hex centers, direction chevrons, start circle */
+const MarkerTrailPath: React.FC<MarkerTrailPathProps> = React.memo(({ marker, hexKeys, gridConfig, scale }) => {
+  const steps = marker.trail?.steps ?? [];
+
+  // Split into runs of steps whose hexes exist; segments touching a removed
+  // hex (grid shrunk) aren't drawn
+  const runs: Array<Array<{ x: number; y: number }>> = [];
+  let run: Array<{ x: number; y: number }> = [];
+  for (const step of steps) {
+    if (hexKeys.has(coordToKey(step.coord))) {
+      run.push(hexToPixel(step.coord, gridConfig));
+    } else {
+      if (run.length > 0) runs.push(run);
+      run = [];
+    }
+  }
+  if (run.length > 0) runs.push(run);
+  if (runs.length === 0) return null;
+
+  const color = marker.color;
+  const arm = TRAIL_CHEVRON_ARM * scale;
+  // Adjacent hex centers are ~1.7 × hexSize apart; shorter segments get no chevron
+  const minChevronLength = gridConfig.hexSize * 1.2;
+
+  const chevrons: string[] = [];
+  for (const points of runs) {
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1];
+      const b = points[i];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const length = Math.hypot(dx, dy);
+      if (length < minChevronLength) continue;
+      // ">" pointing from a to b, centered on the segment midpoint
+      const ux = dx / length;
+      const uy = dy / length;
+      const tipX = (a.x + b.x) / 2 + ux * arm / 2;
+      const tipY = (a.y + b.y) / 2 + uy * arm / 2;
+      const backX = tipX - ux * arm;
+      const backY = tipY - uy * arm;
+      chevrons.push(
+        `M ${backX - uy * arm} ${backY + ux * arm} L ${tipX} ${tipY} L ${backX + uy * arm} ${backY - ux * arm}`
+      );
+    }
+  }
+  const chevronPath = chevrons.join(' ');
+  const start = runs[0][0];
+  const lineProps = { fill: 'none', strokeLinejoin: 'round', strokeLinecap: 'round' } as const;
+
+  return (
+    <g className="marker-trail">
+      {/* Dark halo underneath keeps the line visible on any background */}
+      {runs.map((points, i) => (
+        <polyline
+          key={`halo-${i}`}
+          points={points.map(p => `${p.x},${p.y}`).join(' ')}
+          stroke="#000"
+          strokeOpacity={0.5}
+          strokeWidth={TRAIL_HALO_WIDTH * scale}
+          {...lineProps}
+        />
+      ))}
+      {runs.map((points, i) => (
+        <polyline
+          key={`line-${i}`}
+          points={points.map(p => `${p.x},${p.y}`).join(' ')}
+          stroke={color}
+          strokeOpacity={0.9}
+          strokeWidth={TRAIL_WIDTH * scale}
+          {...lineProps}
+        />
+      ))}
+      {chevronPath && (
+        <>
+          <path d={chevronPath} stroke="#000" strokeOpacity={0.5} strokeWidth={4 * scale} {...lineProps} />
+          <path d={chevronPath} stroke={color} strokeWidth={2 * scale} {...lineProps} />
+        </>
+      )}
+      {/* Start of the trail */}
+      <circle
+        cx={start.x}
+        cy={start.y}
+        r={TRAIL_START_RADIUS * scale}
+        fill="#000"
+        fillOpacity={0.5}
+        stroke={color}
+        strokeWidth={2 * scale}
+      />
+    </g>
+  );
+});
+
+MarkerTrailPath.displayName = 'MarkerTrailPath';
+
 // Selection box component
 interface SelectionBoxProps {
   startX: number;
@@ -468,11 +624,22 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
   );
 
   const showMarkers = settings?.showMarkers ?? true;
+  const showTrails = settings?.showTrails ?? true;
+  const showTerrainColors = settings?.showTerrainColors ?? true;
+  const showExploredStatus = settings?.showExploredStatus ?? false;
+
+  const hexKeys = useMemo(() => new Set(hexes.map(h => coordToKey(h.coord))), [hexes]);
+
+  // Trails to draw, in reverse list order so the first marker ends up on top
+  const visibleTrails = useMemo(
+    // A trail needs at least one move (two points) to draw anything
+    () => markers.filter(m => m.trail?.visible && m.trail.steps.length > 1).reverse(),
+    [markers]
+  );
 
   // Placed markers grouped by hex, in list order. Markers on hexes that no
   // longer exist (grid shrunk) are left out.
   const markersByHex = useMemo(() => {
-    const hexKeys = new Set(hexes.map(h => coordToKey(h.coord)));
     const byHex = new Map<string, Marker[]>();
     for (const marker of markers) {
       if (!marker.coord) continue;
@@ -483,7 +650,7 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
       else byHex.set(key, [marker]);
     }
     return byHex;
-  }, [markers, hexes]);
+  }, [markers, hexKeys]);
 
   const neighborSet = useMemo(() => {
     return new Set(highlightedNeighbors.map(c => coordToKey(c)));
@@ -531,6 +698,16 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
     return { explored, visible };
   }, [hexes, settings?.showExploredStatus]);
   
+  // Per-hex values shared by the fill layer and the decoration layer
+  const hexItems = useMemo(() => hexes.map(hex => {
+    const key = coordToKey(hex.coord);
+    const terrain = getTerrainInfo(getEffectiveTerrain(hex), settings?.customTerrainTypes || []);
+    const isExplored = showExploredStatus
+      ? exploredInfo.explored.has(key) || exploredInfo.visible.has(key)
+      : true;
+    return { key, hex, terrain, isExplored };
+  }), [hexes, settings?.customTerrainTypes, showExploredStatus, exploredInfo]);
+
   // Calculate viewBox
   const viewBox = useMemo(() => {
     // For image overlay mode, use image dimensions so coordinates match pixels
@@ -698,48 +875,72 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
+        {/* Hex fills and borders (clickable) */}
         <g style={{ pointerEvents: 'all' }}>
-          {hexes.map(hex => {
-            const key = coordToKey(hex.coord);
-            const effectiveTerrain = getEffectiveTerrain(hex);
-            const terrain = getTerrainInfo(effectiveTerrain, settings?.customTerrainTypes || []);
-            const isSelected = selectedCoord && coordEquals(hex.coord, selectedCoord);
-            const isMultiSelected = multiSelectedSet.has(key);
-            const isNeighbor = neighborSet.has(key);
-            const factionColor = hexFactionColors.get(key);
-            const isExplored = settings?.showExploredStatus 
-              ? exploredInfo.explored.has(key) || exploredInfo.visible.has(key)
-              : true;
-            
-            return (
-              <HexCell
-                key={key}
-                hex={hex}
-                gridConfig={gridConfig}
-                terrain={terrain}
-                isSelected={!!isSelected}
-                isMultiSelected={isMultiSelected}
-                isNeighbor={isNeighbor}
-                showTerrainColors={settings?.showTerrainColors ?? true}
-                showDataIndicator={settings?.showDataIndicators ?? true}
-                showCoordinates={settings?.showCoordinates ?? true}
-                showGrid={settings?.showGrid ?? true}
-                showLinkIndicators={settings?.showLinkIndicators ?? true}
-                hasLinks={!!(hex.campaignData?.links && Object.keys(hex.campaignData.links).length > 0)}
-                factionColor={factionColor}
-                isExplored={isExplored}
-                showExploredStatus={settings?.showExploredStatus ?? false}
-                fillOpacity={settings?.hexFillOpacity ?? 0.5}
-                gridOpacity={settings?.gridOpacity ?? 0.3}
-                scale={hexScale}
-                hasMarker={markersByHex.has(key)}
-                showMarkers={showMarkers}
-                onClick={(e) => handleHexClick(hex, e)}
-                onMouseEnter={() => handleMouseEnter(hex)}
-                onMouseLeave={handleMouseLeave}
-              />
-            );
-          })}
+          {hexItems.map(({ key, hex, terrain, isExplored }) => (
+            <HexCell
+              key={key}
+              hex={hex}
+              gridConfig={gridConfig}
+              terrain={terrain}
+              isSelected={!!selectedCoord && coordEquals(hex.coord, selectedCoord)}
+              isMultiSelected={multiSelectedSet.has(key)}
+              isNeighbor={neighborSet.has(key)}
+              showTerrainColors={showTerrainColors}
+              showDataIndicator={settings?.showDataIndicators ?? true}
+              showGrid={settings?.showGrid ?? true}
+              factionColor={hexFactionColors.get(key)}
+              isExplored={isExplored}
+              showExploredStatus={showExploredStatus}
+              fillOpacity={settings?.hexFillOpacity ?? 0.5}
+              gridOpacity={settings?.gridOpacity ?? 0.3}
+              scale={hexScale}
+              onClick={(e) => handleHexClick(hex, e)}
+              onMouseEnter={() => handleMouseEnter(hex)}
+              onMouseLeave={handleMouseLeave}
+            />
+          ))}
+        </g>
+
+        {/* Trails: under the marker badges. Always rendered (hidden when the
+            global toggle is off) so image export can include them. */}
+        <g
+          className="trail-layer"
+          pointerEvents="none"
+          display={showTrails ? undefined : 'none'}
+        >
+          {visibleTrails.map(marker => (
+            <MarkerTrailPath
+              key={marker.id}
+              marker={marker}
+              hexKeys={hexKeys}
+              gridConfig={gridConfig}
+              scale={hexScale}
+            />
+          ))}
+        </g>
+
+        {/* Hex labels and badges: above trails so lines never cover them.
+            Clicks pass through to the hex fill below. */}
+        <g className="hex-decorations-layer" pointerEvents="none">
+          {hexItems.map(({ key, hex, terrain, isExplored }) => (
+            <HexDecorations
+              key={key}
+              hex={hex}
+              gridConfig={gridConfig}
+              terrain={terrain}
+              showTerrainColors={showTerrainColors}
+              showCoordinates={settings?.showCoordinates ?? true}
+              showLinkIndicators={settings?.showLinkIndicators ?? true}
+              hasLinks={!!(hex.campaignData?.links && Object.keys(hex.campaignData.links).length > 0)}
+              isExplored={isExplored}
+              showExploredStatus={showExploredStatus}
+              showExploredIndicator={settings?.showExploredIndicators ?? true}
+              scale={hexScale}
+              hasMarker={markersByHex.has(key)}
+              showMarkers={showMarkers}
+            />
+          ))}
         </g>
 
         {/* Markers: above all hexes so borders and selection glow never cover

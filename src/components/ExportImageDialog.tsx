@@ -19,6 +19,8 @@ export interface ImageExportOptions {
   showFactionTerritories: boolean;
   showFogOfWar: boolean;
   showMarkers: boolean;
+  showTrails: boolean;
+  showExploredIndicators: boolean;
   scale: number;
 }
 
@@ -49,6 +51,8 @@ const DEFAULT_OPTIONS: ImageExportOptions = {
   showFactionTerritories: true,
   showFogOfWar: false,
   showMarkers: true,
+  showTrails: true,
+  showExploredIndicators: true,
   scale: 1,
 };
 
@@ -67,12 +71,18 @@ const ExportImageDialog: React.FC<ExportImageDialogProps> = ({
     filename: mapName,
   });
 
-  // Reset filename when map name changes or dialog opens
+  // Reset filename when map name changes or dialog opens. Explored
+  // Indicators starts from the map's setting each time.
+  const mapShowsExploredIndicators = mapSettings?.showExploredIndicators ?? true;
   useEffect(() => {
     if (isOpen) {
-      setOptions(prev => ({ ...prev, filename: mapName }));
+      setOptions(prev => ({
+        ...prev,
+        filename: mapName,
+        showExploredIndicators: mapShowsExploredIndicators,
+      }));
     }
-  }, [isOpen, mapName]);
+  }, [isOpen, mapName, mapShowsExploredIndicators]);
 
   const handleChange = useCallback(<K extends keyof ImageExportOptions>(
     key: K,
@@ -97,6 +107,8 @@ const ExportImageDialog: React.FC<ExportImageDialogProps> = ({
       showFactionTerritories: mapSettings.showFactionTerritories,
       showFogOfWar: mapSettings.showExploredStatus,
       showMarkers: mapSettings.showMarkers ?? true,
+      showTrails: mapSettings.showTrails ?? true,
+      showExploredIndicators: mapSettings.showExploredIndicators ?? true,
     }));
   }, [mapSettings, backgroundImageVisible, backgroundImageOpacity]);
 
@@ -312,12 +324,32 @@ const ExportImageDialog: React.FC<ExportImageDialogProps> = ({
             </div>
 
             <div className="panel-row mb-2">
+              <span className="text-sm">Trails</span>
+              <button
+                className={`btn btn-sm ${options.showTrails ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleChange('showTrails', !options.showTrails)}
+              >
+                {options.showTrails ? 'On' : 'Off'}
+              </button>
+            </div>
+
+            <div className="panel-row mb-2">
               <span className="text-sm">Faction Territories</span>
               <button
                 className={`btn btn-sm ${options.showFactionTerritories ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => handleChange('showFactionTerritories', !options.showFactionTerritories)}
               >
                 {options.showFactionTerritories ? 'On' : 'Off'}
+              </button>
+            </div>
+
+            <div className="panel-row mb-2">
+              <span className="text-sm">Explored Indicators</span>
+              <button
+                className={`btn btn-sm ${options.showExploredIndicators ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleChange('showExploredIndicators', !options.showExploredIndicators)}
+              >
+                {options.showExploredIndicators ? 'On' : 'Off'}
               </button>
             </div>
 

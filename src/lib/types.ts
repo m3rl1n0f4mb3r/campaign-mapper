@@ -254,6 +254,19 @@ export interface Faction {
 // MARKERS
 // ============================================
 
+export interface TrailStep {
+  coord: HexCoord;
+  setExplored?: true;        // This step turned `explored` on, so undo turns it off
+}
+
+/** The route a marker has traveled */
+export interface MarkerTrail {
+  record: boolean;           // Moves append steps
+  visible: boolean;          // Draw the line (independent of record)
+  markExplored: boolean;     // Moving here also marks the hex explored (needs record)
+  steps: TrailStep[];        // Oldest first
+}
+
 /**
  * A named, movable token (e.g. "Party", "Destination").
  * Each marker sits on at most one hex at a time.
@@ -264,6 +277,7 @@ export interface Marker {
   icon: string;              // Key into MARKER_ICONS; unknown keys render as a plain dot
   color: string;             // CSS hex color, e.g. '#e94560'
   coord: HexCoord | null;    // null = not on the map
+  trail?: MarkerTrail;       // undefined = never set up
 }
 
 // ============================================
@@ -297,11 +311,13 @@ export interface CampaignSettings {
   showDataIndicators: boolean;
   showFactionTerritories: boolean;
   showExploredStatus: boolean;
+  showExploredIndicators: boolean;   // Green dot on explored hexes (when fog of war is off)
   showTerrainColors: boolean;
   showGrid: boolean;
   showCoordinates: boolean;
   showLinkIndicators: boolean;
   showMarkers: boolean;
+  showTrails: boolean;       // Master switch; each trail also has its own visible flag
   hexFillOpacity: number;
   gridOpacity: number;
   /** Label Size: user multiplier on top of hex-size-relative decoration sizes. 1 = 100% */
@@ -318,11 +334,13 @@ export const DEFAULT_CAMPAIGN_SETTINGS: CampaignSettings = {
   showDataIndicators: true,
   showFactionTerritories: true,
   showExploredStatus: false,
+  showExploredIndicators: true,
   showTerrainColors: true,
   showGrid: true,
   showCoordinates: true,
   showLinkIndicators: true,
   showMarkers: true,
+  showTrails: true,
   hexFillOpacity: 0.5,
   gridOpacity: 0.3,
   labelScale: 1,
