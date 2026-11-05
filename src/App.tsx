@@ -30,6 +30,9 @@ import {
   reorderMarker,
   deleteMarker,
   createMarkerId,
+  undoTrailStep,
+  clearTrail,
+  setTrailOptions,
 } from '@/lib/mapFactory';
 import { 
   saveMap, 
@@ -251,14 +254,22 @@ function App() {
 
   // Markers
   const handleCreateMarker = useCallback((values: MarkerFormValues, coord: HexCoord | null) => {
-    setCurrentMap(map => map && addMarker(map, { id: createMarkerId(), ...values, coord }));
+    const { trail, ...look } = values;
+    setCurrentMap(map => map && addMarker(map, {
+      id: createMarkerId(),
+      ...look,
+      coord,
+      trail: { ...trail, steps: [] },
+    }));
   }, []);
 
   const handleAddStarterMarkers = useCallback(() => {
     setCurrentMap(map => {
       if (!map) return map;
+      // Party records its route and marks hexes explored by default
       const withParty = addMarker(map, {
         id: createMarkerId(), name: 'Party', icon: 'users', color: '#e6194b', coord: null,
+        trail: { record: true, visible: true, markExplored: true, steps: [] },
       });
       return addMarker(withParty, {
         id: createMarkerId(), name: 'Destination', icon: 'flag', color: '#4363d8', coord: null,
@@ -267,7 +278,20 @@ function App() {
   }, []);
 
   const handleUpdateMarker = useCallback((id: string, values: MarkerFormValues) => {
-    setCurrentMap(map => map && updateMarker(map, id, values));
+    const { trail, ...look } = values;
+    setCurrentMap(map => map && setTrailOptions(updateMarker(map, id, look), id, trail));
+  }, []);
+
+  const handleSetTrailVisible = useCallback((id: string, visible: boolean) => {
+    setCurrentMap(map => map && setTrailOptions(map, id, { visible }));
+  }, []);
+
+  const handleUndoTrailStep = useCallback((id: string) => {
+    setCurrentMap(map => map && undoTrailStep(map, id));
+  }, []);
+
+  const handleClearTrail = useCallback((id: string) => {
+    setCurrentMap(map => map && clearTrail(map, id));
   }, []);
 
   const handleMoveMarker = useCallback((id: string, coord: HexCoord | null) => {
@@ -834,6 +858,9 @@ function App() {
                 onMove={handleMoveMarker}
                 onReorder={handleReorderMarker}
                 onDelete={handleDeleteMarker}
+                onSetTrailVisible={handleSetTrailVisible}
+                onUndoTrailStep={handleUndoTrailStep}
+                onClearTrail={handleClearTrail}
                 onGoTo={handleHexListClick}
                 onClose={handleCloseSidebar}
               />

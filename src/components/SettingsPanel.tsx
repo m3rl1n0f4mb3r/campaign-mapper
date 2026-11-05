@@ -719,12 +719,32 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <div className="panel-row mb-2">
+          <span className="panel-row-label">Trails</span>
+          <button
+            className={`btn btn-sm ${(settings?.showTrails ?? true) ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => onSettingsChange({ showTrails: !(settings?.showTrails ?? true) })}
+          >
+            {(settings?.showTrails ?? true) ? 'On' : 'Off'}
+          </button>
+        </div>
+
+        <div className="panel-row mb-2">
           <span className="panel-row-label">Faction Territories</span>
           <button
             className={`btn btn-sm ${settings?.showFactionTerritories ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => onSettingsChange({ showFactionTerritories: !settings?.showFactionTerritories })}
           >
             {settings?.showFactionTerritories ? 'On' : 'Off'}
+          </button>
+        </div>
+
+        <div className="panel-row mb-2">
+          <span className="panel-row-label">Explored Indicators</span>
+          <button
+            className={`btn btn-sm ${(settings?.showExploredIndicators ?? true) ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => onSettingsChange({ showExploredIndicators: !(settings?.showExploredIndicators ?? true) })}
+          >
+            {(settings?.showExploredIndicators ?? true) ? 'On' : 'Off'}
           </button>
         </div>
 

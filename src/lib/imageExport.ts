@@ -24,6 +24,8 @@ export interface ImageExportOptions {
   showFactionTerritories?: boolean;
   showFogOfWar?: boolean;
   showMarkers?: boolean;
+  showTrails?: boolean;
+  showExploredIndicators?: boolean;
   scale?: number;
 }
 
@@ -43,6 +45,8 @@ const DEFAULT_OPTIONS: Required<Omit<ImageExportOptions, 'backgroundImage'>> = {
   showFactionTerritories: true,
   showFogOfWar: false,
   showMarkers: true,
+  showTrails: true,
+  showExploredIndicators: true,
   scale: 1,
 };
 
@@ -91,7 +95,6 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
 
     // Get terrain data from data attributes
     const terrainColor = polygon.getAttribute('data-terrain-color') || '#808080';
-    const terrainSymbol = polygon.getAttribute('data-terrain-symbol') || '';
 
     // Apply terrain fill color from data attribute (overrides current fill)
     // This ensures export works even when "Show Terrain Colors" is off
@@ -116,6 +119,12 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
         polygon.style.stroke = 'none';
       }
     }
+  });
+
+  // Process each hex's labels and badges (drawn in a separate layer above trails)
+  clone.querySelectorAll('.hex-decorations').forEach(decorationGroup => {
+    const group = decorationGroup as SVGGElement;
+    const terrainSymbol = group.getAttribute('data-terrain-symbol') || '';
 
     // Handle terrain symbols (tied to terrain colors setting).
     // A marker badge covers the symbol, so skip it on hexes with markers.
@@ -211,9 +220,22 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
     else el.remove();
   });
 
+  // Handle trails (same approach as markers)
+  clone.querySelectorAll('.trail-layer').forEach(el => {
+    if (opts.showTrails) el.removeAttribute('display');
+    else el.remove();
+  });
+
+  // Explored dots: shown when enabled and fog of war is off (fog already shows
+  // what's explored), matching the screen
+  const showExploredDots = opts.showExploredIndicators && !opts.showFogOfWar;
+  clone.querySelectorAll('.hex-explored-dot').forEach(el => {
+    if (showExploredDots) el.removeAttribute('display');
+    else el.remove();
+  });
+
   // Handle fog of war (explored status)
   if (!opts.showFogOfWar) {
-    clone.querySelectorAll('.hex-explored-dot').forEach(el => el.remove());
     clone.querySelectorAll('.hex-unexplored').forEach(el => {
       el.classList.remove('hex-unexplored');
     });

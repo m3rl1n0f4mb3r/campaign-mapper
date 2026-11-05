@@ -1729,3 +1729,61 @@ body {
   gap: 4px;
   margin-top: var(--spacing-xs);
 }
+
+/* Trail line in a Markers panel row */
+.marker-list-trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--border-color);
+}
+
+.marker-list-trail-status {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.marker-list-trail .btn {
+  min-height: 32px;
+}
+
+/* Trail checkboxes in the marker form */
+.marker-form-check {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 32px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.marker-form-check input {
+  width: 18px;
+  height: 18px;
+}
+
+.marker-form-check.disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.marker-form-trail-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--spacing-xs);
+}
+
+.marker-form-trail-steps .text-sm {
+  flex: 1;
+}
+
+.marker-form-trail-steps .btn {
+  min-height: 32px;
+}
