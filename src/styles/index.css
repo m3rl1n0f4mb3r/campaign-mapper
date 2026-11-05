@@ -883,6 +883,65 @@ body {
   flex: 1;
 }
 
+/* What's New */
+.whats-new {
+  max-width: 520px;
+}
+
+.whats-new-release + .whats-new-release {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+}
+
+.whats-new-version {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+}
+
+.whats-new-date {
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.whats-new-item + .whats-new-item {
+  margin-top: var(--spacing-md);
+}
+
+.whats-new-item-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.whats-new-request {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.whats-new-item-description {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.whats-new-footer {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.whats-new-footer .btn {
+  min-height: 36px;
+  min-width: 88px;
+}
+
 /* Confirm/error dialogs: above other modals (e.g. delete from Open Map) */
 .dialog-overlay {
   z-index: 1100;

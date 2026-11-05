@@ -404,6 +404,8 @@ export interface AppSettings {
   theme: 'dark' | 'light';
   recentMaps: MapReference[];
   defaultGridConfig: Partial<GridConfig>;
+  /** Newest version whose What's New the user has seen (undefined = from before What's New) */
+  lastSeenVersion?: string;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {

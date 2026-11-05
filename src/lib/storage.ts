@@ -90,6 +90,20 @@ export function loadAppSettings(): AppSettings {
   return { ...DEFAULT_APP_SETTINGS };
 }
 
+/** False for a brand-new user: nothing has ever been saved on this device */
+export function hasSavedAppSettings(): boolean {
+  try {
+    return localStorage.getItem(SETTINGS_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** Record that the user has seen What's New for this version */
+export function markVersionSeen(version: string): void {
+  saveAppSettings({ ...loadAppSettings(), lastSeenVersion: version });
+}
+
 export function saveAppSettings(settings: AppSettings): void {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
