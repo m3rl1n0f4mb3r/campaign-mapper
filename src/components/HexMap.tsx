@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useState, useRef, forwardRef, useImperativeHandle } from 'react';
-import type { Hex, HexCoord, GridConfig, TerrainType, Faction, ImageOverlay, CampaignSettings } from '@/lib/types';
+import type { Hex, HexCoord, GridConfig, TerrainType, Faction, ImageOverlay, CampaignSettings, Marker } from '@/lib/types';
 import { coordToKey, hexHasUserData, getEffectiveTerrain, DEFAULT_TERRAIN_TYPES } from '@/lib/types';
 import { 
   hexToPixel, 
@@ -11,6 +11,8 @@ import {
   axialToOffset,
 } from '@/lib/hexUtils';
 import { BASE_DECORATION_SIZES as SIZES, getHexScale } from '@/lib/hexDecorations';
+import { FACTION_COLORS, getContrastText } from '@/lib/palette';
+import { getMarkerIcon } from '@/lib/markerIcons';
 
 interface HexMapProps {
   hexes: Hex[];
@@ -21,6 +23,7 @@ interface HexMapProps {
   multiSelectedCoords: HexCoord[];
   highlightedNeighbors?: HexCoord[];
   factions: Faction[];
+  markers: Marker[];
   zoom: number;
   onHexClick: (coord: HexCoord, event: React.MouseEvent) => void;
   onHexHover?: (coord: HexCoord | null) => void;
@@ -39,10 +42,7 @@ function getFactionColor(factionId: string, factions: Faction[]): string {
   const faction = factions.find(f => f.id === factionId);
   if (faction?.color) return faction.color;
   
-  const colors = [
-    '#e94560', '#4ade80', '#60a5fa', '#fbbf24', '#a78bfa',
-    '#f472b6', '#34d399', '#38bdf8', '#fb923c', '#c084fc',
-  ];
+  const colors = FACTION_COLORS;
   
   let hash = 0;
   for (let i = 0; i < factionId.length; i++) {
@@ -99,6 +99,10 @@ interface HexCellProps {
   gridOpacity: number;
   /** Decoration size multiplier from getHexScale() */
   scale: number;
+  /** A marker is on this hex (marked on the group for image export) */
+  hasMarker: boolean;
+  /** Markers are drawn, so the terrain symbol under the badge is hidden */
+  showMarkers: boolean;
   onClick: (event: React.MouseEvent) => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -123,6 +127,8 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
   fillOpacity,
   gridOpacity,
   scale,
+  hasMarker,
+  showMarkers,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -172,6 +178,7 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
       data-coord={displayCoord}
       data-coord-x={coordOffset.x}
       data-coord-y={coordOffset.y}
+      data-has-marker={hasMarker || undefined}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -196,7 +203,7 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
       />
       
       {/* Terrain symbol */}
-      {showTerrainColors && terrain.symbol && (!showExploredStatus || isExplored) && (
+      {showTerrainColors && terrain.symbol && (!showExploredStatus || isExplored) && !(hasMarker && showMarkers) && (
         <text className="hex-symbol" x={0} y={0} fontSize={SIZES.symbolFont * scale}>
           {terrain.symbol}
         </text>
@@ -274,6 +281,102 @@ const HexCell: React.FC<HexCellProps> = React.memo(({
 
 HexCell.displayName = 'HexCell';
 
+// ============================================
+// MARKERS
+// ============================================
+
+/** Base sizes at a 32px hex; multiplied by the hex scale */
+const MARKER_BADGE_RADIUS = 11;
+const MARKER_SHARED_FACTOR = 0.8;   // badge size when 2+ markers share a hex
+
+interface MarkerBadgeProps {
+  marker: Marker;
+  cx: number;
+  cy: number;
+  r: number;
+  scale: number;
+}
+
+const MarkerBadge: React.FC<MarkerBadgeProps> = ({ marker, cx, cy, r, scale }) => {
+  const Icon = getMarkerIcon(marker.icon);
+  const iconSize = r * 1.2;
+  return (
+    <g className="marker-badge">
+      {/* Dark halo so the badge stands out on light and dark images */}
+      <circle cx={cx} cy={cy} r={r + 2.5 * scale} fill="#000" fillOpacity={0.5} />
+      <circle cx={cx} cy={cy} r={r} fill={marker.color} stroke="#fff" strokeWidth={1.5 * scale} />
+      {/* Unknown icon keys render as a plain dot */}
+      {Icon && (
+        <Icon
+          x={cx - iconSize / 2}
+          y={cy - iconSize / 2}
+          size={iconSize}
+          color={getContrastText(marker.color)}
+          strokeWidth={2.5}
+        />
+      )}
+    </g>
+  );
+};
+
+interface MarkerClusterProps {
+  markers: Marker[];         // In list order; non-empty
+  gridConfig: GridConfig;
+  scale: number;
+}
+
+/** 1 marker: centered. 2: side by side. 3+: first two plus a "+N" pill. */
+const MarkerCluster: React.FC<MarkerClusterProps> = React.memo(({ markers, gridConfig, scale }) => {
+  const { x, y } = hexToPixel(markers[0].coord!, gridConfig);
+  const fullR = MARKER_BADGE_RADIUS * scale;
+
+  if (markers.length === 1) {
+    return <MarkerBadge marker={markers[0]} cx={x} cy={y} r={fullR} scale={scale} />;
+  }
+
+  const r = fullR * MARKER_SHARED_FACTOR;
+  const dx = r * 1.1;
+  const extra = markers.length - 2;
+  // Lift the pair a little to make room for the pill
+  const cy = extra > 0 ? y - r * 0.35 : y;
+  const pillW = 16 * scale;
+  const pillH = 9 * scale;
+  const pillY = cy + r + 1.5 * scale;
+
+  return (
+    <g>
+      <MarkerBadge marker={markers[0]} cx={x - dx} cy={cy} r={r} scale={scale} />
+      <MarkerBadge marker={markers[1]} cx={x + dx} cy={cy} r={r} scale={scale} />
+      {extra > 0 && (
+        <g className="marker-more">
+          <rect
+            x={x - pillW / 2}
+            y={pillY}
+            width={pillW}
+            height={pillH}
+            rx={pillH / 2}
+            fill="#000"
+            fillOpacity={0.75}
+          />
+          <text
+            x={x}
+            y={pillY + pillH / 2}
+            fill="#fff"
+            fontSize={7 * scale}
+            fontWeight="bold"
+            textAnchor="middle"
+            dominantBaseline="central"
+          >
+            +{extra}
+          </text>
+        </g>
+      )}
+    </g>
+  );
+});
+
+MarkerCluster.displayName = 'MarkerCluster';
+
 // Selection box component
 interface SelectionBoxProps {
   startX: number;
@@ -312,6 +415,7 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
   multiSelectedCoords,
   highlightedNeighbors = [],
   factions,
+  markers,
   zoom,
   onHexClick,
   onHexHover,
@@ -362,6 +466,24 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
     () => getHexScale(gridConfig, settings),
     [gridConfig, settings]
   );
+
+  const showMarkers = settings?.showMarkers ?? true;
+
+  // Placed markers grouped by hex, in list order. Markers on hexes that no
+  // longer exist (grid shrunk) are left out.
+  const markersByHex = useMemo(() => {
+    const hexKeys = new Set(hexes.map(h => coordToKey(h.coord)));
+    const byHex = new Map<string, Marker[]>();
+    for (const marker of markers) {
+      if (!marker.coord) continue;
+      const key = coordToKey(marker.coord);
+      if (!hexKeys.has(key)) continue;
+      const list = byHex.get(key);
+      if (list) list.push(marker);
+      else byHex.set(key, [marker]);
+    }
+    return byHex;
+  }, [markers, hexes]);
 
   const neighborSet = useMemo(() => {
     return new Set(highlightedNeighbors.map(c => coordToKey(c)));
@@ -610,12 +732,33 @@ const HexMap = forwardRef<HexMapHandle, HexMapProps>(({
                 fillOpacity={settings?.hexFillOpacity ?? 0.5}
                 gridOpacity={settings?.gridOpacity ?? 0.3}
                 scale={hexScale}
+                hasMarker={markersByHex.has(key)}
+                showMarkers={showMarkers}
                 onClick={(e) => handleHexClick(hex, e)}
                 onMouseEnter={() => handleMouseEnter(hex)}
                 onMouseLeave={handleMouseLeave}
               />
             );
           })}
+        </g>
+
+        {/* Markers: above all hexes so borders and selection glow never cover
+            them. Always rendered (hidden when off) so image export can
+            include them even when they're hidden on screen. Clicks pass
+            through to the hex below. */}
+        <g
+          className="marker-layer"
+          pointerEvents="none"
+          display={showMarkers ? undefined : 'none'}
+        >
+          {[...markersByHex].map(([key, hexMarkers]) => (
+            <MarkerCluster
+              key={key}
+              markers={hexMarkers}
+              gridConfig={gridConfig}
+              scale={hexScale}
+            />
+          ))}
         </g>
         
         {/* Selection box */}

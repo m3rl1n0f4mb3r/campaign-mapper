@@ -1,4 +1,5 @@
 import type { CampaignMap, AppSettings, MapReference } from './types';
+import { normalizeMap } from './mapFactory';
 import { DEFAULT_APP_SETTINGS } from './types';
 
 const STORAGE_PREFIX = 'campaign-mapper';
@@ -113,7 +114,7 @@ export async function loadMap(id: string): Promise<CampaignMap | null> {
   try {
     const saved = localStorage.getItem(getMapKey(id));
     if (saved) {
-      const map = JSON.parse(saved) as CampaignMap;
+      const map = normalizeMap(JSON.parse(saved) as CampaignMap);
       
       // Load image from IndexedDB if this is an overlay map
       if (map.imageOverlay && !map.imageOverlay.src) {
@@ -258,6 +259,8 @@ export function importMap(file: File): Promise<CampaignMap> {
           throw new Error('Invalid map file: missing required fields');
         }
         
+        normalizeMap(map);
+
         // Generate new ID to avoid conflicts
         map.id = `map-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         map.updatedAt = new Date().toISOString();

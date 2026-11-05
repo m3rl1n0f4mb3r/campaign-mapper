@@ -10,6 +10,9 @@ import { generateNameOptions } from '@/lib/generator/nameGenerator';
 import { createFactionFromSettlement, generateFactionRelationships } from '@/lib/generator/politicalGenerator';
 import { generateRegion, generate19HexRegion, generateFeaturesOnly } from '@/lib/generator/mapGenerator';
 
+import MarkerStrip from './MarkerStrip';
+import type { MarkerFormValues } from './MarkerForm';
+
 // Accordion component for collapsible sections
 interface AccordionProps {
   title: string;
@@ -53,6 +56,9 @@ interface HexDetailPanelProps {
   onBulkHexUpdateWithFactions: (hexUpdates: Array<{ coord: HexCoord; changes: Partial<Hex> }>, newFactions: Faction[]) => void;
   onAddFaction: (faction: Faction) => void;
   onUpdateFaction: (faction: Faction) => void;
+  onMoveMarker: (markerId: string, coord: HexCoord | null) => void;
+  /** Create a marker placed on this hex */
+  onCreateMarker: (values: MarkerFormValues) => void;
   onClose: () => void;
 }
 
@@ -110,6 +116,8 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
   onBulkHexUpdateWithFactions,
   onAddFaction,
   onUpdateFaction,
+  onMoveMarker,
+  onCreateMarker,
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
@@ -873,6 +881,16 @@ const HexDetailPanel: React.FC<HexDetailPanelProps> = ({
         </div>
       </div>
       
+      {/* Markers: above the tabs so they work from any tab, no edit mode */}
+      <MarkerStrip
+        markers={map.markers}
+        hexes={map.hexes}
+        gridConfig={gridConfig}
+        coord={hex.coord}
+        onMove={onMoveMarker}
+        onCreate={onCreateMarker}
+      />
+
       {/* Tabs */}
       <div className="tabs">
         <button

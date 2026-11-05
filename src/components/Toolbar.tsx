@@ -13,6 +13,7 @@ interface ToolbarProps {
   onOpenSettings: () => void;
   onMapNameChange: (name: string) => void;
   onStatsClick: (filter: StatsFilterType) => void;
+  onOpenMarkers: () => void;
   selectedCount: number;
   onClearSelection: () => void;
   zoom: number;
@@ -31,6 +32,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onOpenSettings,
   onMapNameChange,
   onStatsClick,
+  onOpenMarkers,
   selectedCount,
   onClearSelection,
   zoom,
@@ -88,6 +90,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     withTags: map.hexes.filter(h => h.campaignData?.tags?.length).length,
     factions: map.factions?.filter(f => f.type !== 'region').length ?? 0,
     regions: map.factions?.filter(f => f.type === 'region').length ?? 0,
+    markers: map.markers?.length ?? 0,
   } : null;
   
   return (
@@ -251,6 +254,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
               title="Regions - click to manage"
             >
               🗺 {stats.regions}
+            </button>
+            <button
+              className="toolbar-stat-btn"
+              onClick={onOpenMarkers}
+              title="Markers - click to manage"
+            >
+              📍 {stats.markers}
             </button>
           </div>
         )}

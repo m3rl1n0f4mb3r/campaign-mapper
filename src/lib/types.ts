@@ -251,6 +251,22 @@ export interface Faction {
 }
 
 // ============================================
+// MARKERS
+// ============================================
+
+/**
+ * A named, movable token (e.g. "Party", "Destination").
+ * Each marker sits on at most one hex at a time.
+ */
+export interface Marker {
+  id: string;
+  name: string;
+  icon: string;              // Key into MARKER_ICONS; unknown keys render as a plain dot
+  color: string;             // CSS hex color, e.g. '#e94560'
+  coord: HexCoord | null;    // null = not on the map
+}
+
+// ============================================
 // MAP
 // ============================================
 
@@ -285,6 +301,7 @@ export interface CampaignSettings {
   showGrid: boolean;
   showCoordinates: boolean;
   showLinkIndicators: boolean;
+  showMarkers: boolean;
   hexFillOpacity: number;
   gridOpacity: number;
   /** Label Size: user multiplier on top of hex-size-relative decoration sizes. 1 = 100% */
@@ -305,6 +322,7 @@ export const DEFAULT_CAMPAIGN_SETTINGS: CampaignSettings = {
   showGrid: true,
   showCoordinates: true,
   showLinkIndicators: true,
+  showMarkers: true,
   hexFillOpacity: 0.5,
   gridOpacity: 0.3,
   labelScale: 1,
@@ -332,6 +350,9 @@ export interface CampaignMap {
   
   // Factions
   factions: Faction[];
+
+  // Markers, in list order (decides strip chips and badge order)
+  markers: Marker[];
   
   // Image overlay (for overlay mode)
   imageOverlay?: ImageOverlay;

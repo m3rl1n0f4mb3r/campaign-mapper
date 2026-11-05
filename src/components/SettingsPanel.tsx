@@ -709,6 +709,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <div className="panel-row mb-2">
+          <span className="panel-row-label">Markers</span>
+          <button
+            className={`btn btn-sm ${(settings?.showMarkers ?? true) ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => onSettingsChange({ showMarkers: !(settings?.showMarkers ?? true) })}
+          >
+            {(settings?.showMarkers ?? true) ? 'On' : 'Off'}
+          </button>
+        </div>
+
+        <div className="panel-row mb-2">
           <span className="panel-row-label">Faction Territories</span>
           <button
             className={`btn btn-sm ${settings?.showFactionTerritories ? 'btn-primary' : 'btn-secondary'}`}

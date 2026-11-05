@@ -2,8 +2,10 @@ import type {
   CampaignMap, 
   GridConfig, 
   Hex, 
+  HexCoord,
   ImageOverlay,
   MapMode,
+  Marker,
 } from './types';
 import { 
   DEFAULT_GRID_CONFIG, 
@@ -53,6 +55,7 @@ export function createMap(options: CreateMapOptions): CampaignMap {
     gridConfig,
     hexes,
     factions: [],
+    markers: [],
     imageOverlay: options.imageOverlay,
     settings: { ...DEFAULT_CAMPAIGN_SETTINGS },
   };
@@ -303,4 +306,73 @@ export function bulkAddTags(
     hexes: newHexes,
     updatedAt: new Date().toISOString(),
   };
+}
+
+// ============================================
+// MARKERS
+// ============================================
+
+/**
+ * Fill in fields that maps saved by older versions don't have.
+ * Mutates and returns the map; used when loading and importing.
+ */
+export function normalizeMap(map: CampaignMap): CampaignMap {
+  if (!Array.isArray(map.markers)) {
+    map.markers = [];
+  }
+  return map;
+}
+
+export function createMarkerId(): string {
+  return `marker-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+function withMarkers(map: CampaignMap, markers: Marker[]): CampaignMap {
+  return { ...map, markers, updatedAt: new Date().toISOString() };
+}
+
+/** Add a marker at the end of the list */
+export function addMarker(map: CampaignMap, marker: Marker): CampaignMap {
+  return withMarkers(map, [...map.markers, marker]);
+}
+
+/** Update a marker's name, icon or color (use moveMarker to place it) */
+export function updateMarker(
+  map: CampaignMap,
+  id: string,
+  changes: Partial<Pick<Marker, 'name' | 'icon' | 'color'>>
+): CampaignMap {
+  return withMarkers(map, map.markers.map(m => (m.id === id ? { ...m, ...changes } : m)));
+}
+
+/** Swap a marker with its neighbor in list order */
+export function reorderMarker(map: CampaignMap, id: string, direction: 'up' | 'down'): CampaignMap {
+  const index = map.markers.findIndex(m => m.id === id);
+  const target = direction === 'up' ? index - 1 : index + 1;
+  if (index < 0 || target < 0 || target >= map.markers.length) return map;
+
+  const markers = [...map.markers];
+  [markers[index], markers[target]] = [markers[target], markers[index]];
+  return withMarkers(map, markers);
+}
+
+/**
+ * Place a marker on a hex, or take it off the map (coord = null).
+ * All marker placement goes through here.
+ */
+export function moveMarker(map: CampaignMap, id: string, coord: HexCoord | null): CampaignMap {
+  const marker = map.markers.find(m => m.id === id);
+  if (!marker) return map;
+
+  const current = marker.coord;
+  const unchanged = coord === null
+    ? current === null
+    : current !== null && current.q === coord.q && current.r === coord.r;
+  if (unchanged) return map;
+
+  return withMarkers(map, map.markers.map(m => (m.id === id ? { ...m, coord } : m)));
+}
+
+export function deleteMarker(map: CampaignMap, id: string): CampaignMap {
+  return withMarkers(map, map.markers.filter(m => m.id !== id));
 }

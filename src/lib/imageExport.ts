@@ -23,6 +23,7 @@ export interface ImageExportOptions {
   showLinkIndicators?: boolean;
   showFactionTerritories?: boolean;
   showFogOfWar?: boolean;
+  showMarkers?: boolean;
   scale?: number;
 }
 
@@ -41,6 +42,7 @@ const DEFAULT_OPTIONS: Required<Omit<ImageExportOptions, 'backgroundImage'>> = {
   showLinkIndicators: true,
   showFactionTerritories: true,
   showFogOfWar: false,
+  showMarkers: true,
   scale: 1,
 };
 
@@ -115,9 +117,11 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
       }
     }
 
-    // Handle terrain symbols (tied to terrain colors setting)
+    // Handle terrain symbols (tied to terrain colors setting).
+    // A marker badge covers the symbol, so skip it on hexes with markers.
+    const coveredByMarker = opts.showMarkers && group.hasAttribute('data-has-marker');
     let symbolEl = group.querySelector('.hex-symbol') as SVGTextElement | null;
-    if (opts.showTerrainColors && terrainSymbol) {
+    if (opts.showTerrainColors && terrainSymbol && !coveredByMarker) {
       if (!symbolEl) {
         // Create symbol element if it doesn't exist
         symbolEl = createSvgText(terrainSymbol, 0, 0, 'hex-symbol', {
@@ -200,6 +204,12 @@ function inlineStyles(svg: SVGSVGElement, options: ImageExportOptions): SVGSVGEl
       }
     });
   }
+
+  // Handle markers (the layer is always in the DOM, hidden when off on screen)
+  clone.querySelectorAll('.marker-layer').forEach(el => {
+    if (opts.showMarkers) el.removeAttribute('display');
+    else el.remove();
+  });
 
   // Handle fog of war (explored status)
   if (!opts.showFogOfWar) {
