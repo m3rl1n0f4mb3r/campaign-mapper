@@ -2,6 +2,8 @@
 
 A hex map campaign manager for tabletop RPGs. Create, manage, and explore hexcrawl sandbox campaigns with procedural generation, image overlays, faction tracking, and comprehensive campaign notes.
 
+**Try it:** https://campaign-mapper.vercel.app · **Community:** [Grand Design on Discord](https://discord.gg/vv2tZspAGG) for questions, bug reports, ideas and table talk.
+
 ## Features
 
 ### Hex Grid System

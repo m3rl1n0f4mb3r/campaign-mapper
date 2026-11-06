@@ -218,6 +218,7 @@ body {
   color: var(--text-primary);
   font-size: 13px;
   text-align: left;
+  white-space: nowrap; /* Menu widens to fit the longest item */
   cursor: pointer;
   transition: background var(--transition-fast);
 }
@@ -935,6 +936,19 @@ body {
 .whats-new-footer {
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.whats-new-footer a {
+  color: var(--info);
+}
+
+/* Link items (e.g. Community) look like the button items */
+a.toolbar-dropdown-item {
+  box-sizing: border-box;
+  text-decoration: none;
+  font: inherit;
+  font-size: 13px;
 }
 
 .whats-new-footer .btn {
