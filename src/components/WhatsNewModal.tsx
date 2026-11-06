@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import type { ChangelogEntry } from '@/lib/changelog';
 import { APP_VERSION } from '@/lib/version';
+import { DISCORD_INVITE_URL } from '@/lib/links';
 
 interface WhatsNewModalProps {
   /** Newest first */
@@ -60,7 +61,12 @@ const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ entries, onClose }) => {
         </div>
 
         <div className="modal-footer whats-new-footer">
-          <span className="text-sm text-muted">Version {APP_VERSION}</span>
+          <span className="text-sm text-muted">
+            Version {APP_VERSION} ·{' '}
+            <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
+              Join the community on Discord
+            </a>
+          </span>
           <button className="btn btn-primary" onClick={onClose} autoFocus>
             Got it
           </button>

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { CampaignMap } from '@/lib/types';
+import { DISCORD_INVITE_URL } from '@/lib/links';
 
 export type StatsFilterType = 'all' | 'withData' | 'explored' | 'factions' | 'withFeatures' | 'withTags';
 
@@ -153,6 +154,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 >
                   What's New
                 </button>
+                <a
+                  className="toolbar-dropdown-item"
+                  href={DISCORD_INVITE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setShowMapsMenu(false)}
+                >
+                  Discord Community ↗
+                </a>
               </div>
             )}
           </div>
